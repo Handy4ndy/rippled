@@ -99,6 +99,9 @@ private:
             case asfAllowTrustLineLocking:
                 mask_ |= lsfAllowTrustLineLocking;
                 break;
+            case asfMinPayment:
+                mask_ |= lsfMinPayment;
+                break;   
             default:
                 Throw<std::runtime_error>("unknown flag");
         }

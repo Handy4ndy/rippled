@@ -69,9 +69,12 @@ constexpr std::uint32_t tfRequireAuth                      = 0x00040000;
 constexpr std::uint32_t tfOptionalAuth                     = 0x00080000;
 constexpr std::uint32_t tfDisallowXRP                      = 0x00100000;
 constexpr std::uint32_t tfAllowXRP                         = 0x00200000;
+constexpr std::uint32_t tfMinPayment                       = 0x00400000;
+constexpr std::uint32_t tfAllowMinPayment                  = 0x00800000;
 constexpr std::uint32_t tfAccountSetMask =
     ~(tfUniversal | tfRequireDestTag | tfOptionalDestTag | tfRequireAuth |
-      tfOptionalAuth | tfDisallowXRP | tfAllowXRP);
+      tfOptionalAuth | tfDisallowXRP | tfAllowXRP | tfMinPayment |
+      tfAllowMinPayment);
 
 // AccountSet SetFlag/ClearFlag values
 constexpr std::uint32_t asfRequireDest                     =  1;
@@ -93,6 +96,7 @@ constexpr std::uint32_t asfDisallowIncomingPayChan         = 14;
 constexpr std::uint32_t asfDisallowIncomingTrustline       = 15;
 constexpr std::uint32_t asfAllowTrustLineClawback          = 16;
 constexpr std::uint32_t asfAllowTrustLineLocking           = 17;
+constexpr std::uint32_t asfMinPayment                      = 18;
 
 // OfferCreate flags:
 constexpr std::uint32_t tfPassive                          = 0x00010000;
