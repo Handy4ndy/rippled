@@ -345,20 +345,16 @@ Payment::preclaim(PreclaimContext const& ctx)
         return tecDST_TAG_NEEDED;
     }
 
-    // Check MinPayment flag for minimum XRP payment amount
-    if (sleDst && (sleDst->getFlags() & lsfMinPayment) && dstAmount.native())
+    // Block's XRP Payments below the base fee with the lsfDisallowIncomingMinimum flag.
+    if (sleDst && (sleDst->getFlags() & lsfDisallowIncomingMinimum) &&
+        dstAmount.native() && dstAmount.xrp() <= ctx.view.fees().base)
     {
-        // If destination has minAmount flag set,incoming XRP payments
-        // must exceed twice the base fee amount
-        XRPAmount const minAmount = ctx.view.fees().base * 2;
-        if (dstAmount.xrp() <= minAmount)
-        {
-            JLOG(ctx.j.trace())
-                << "Payment blocked: MinPayment flag requires minimum "
-                << "payment of " << minAmount 
-                << " but payment is " << dstAmount.xrp();
-            return tecNO_PERMISSION;
-        }
+        XRPAmount const minAmount = ctx.view.fees().base;
+        JLOG(ctx.j.trace())
+            << "Payment blocked: DisallowIncomingMinimum flag requires minimum "
+            << "payment of " << minAmount << " but payment is "
+            << dstAmount.xrp();
+        return tecNO_PERMISSION;
     }
 
     // Payment with at least one intermediate step and uses transitive balances.

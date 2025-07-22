@@ -135,7 +135,7 @@ enum LedgerSpecificFlags {
     lsfDefaultRipple =
         0x00800000,               // True, incoming trust lines allow rippling by default
     lsfDepositAuth = 0x01000000,  // True, all deposits require authorization
-    lsfMinPayment = 0x00400000,  // True, minimum payment is enforced
+    lsfDisallowIncomingMinimum = 0x00400000,  // True, minimum payment is enforced
 /*  // reserved for Hooks amendment
     lsfTshCollect = 0x02000000,     // True, allow TSH collect-calls to acc hooks
 

@@ -125,19 +125,6 @@ SetAccount::preflight(PreflightContext const& ctx)
         return temINVALID_FLAG;
     }
 
-     //
-    // MinPayment
-    bool bSetMinPayment =
-    (uTxFlags & tfMinPayment) || (uSetFlag == asfMinPayment);
-    bool bClearMinPayment =
-        (uTxFlags & tfAllowMinPayment) || (uClearFlag == asfMinPayment);
-
-    if (bSetMinPayment && bClearMinPayment)
-    {
-        JLOG(j.trace()) << "Malformed transaction: Contradictory MinPayment flags set.";
-        return temINVALID_FLAG;
-    }
-
     // TransferRate
     if (tx.isFieldPresent(sfTransferRate))
     {
@@ -344,6 +331,7 @@ SetAccount::doApply()
         (uTxFlags & tfOptionalDestTag) || (uClearFlag == asfRequireDest)};
     bool const bSetRequireAuth{
         (uTxFlags & tfRequireAuth) || (uSetFlag == asfRequireAuth)};
+
     bool const bClearRequireAuth{
         (uTxFlags & tfOptionalAuth) || (uClearFlag == asfRequireAuth)};
     bool const bSetDisallowXRP{
@@ -352,20 +340,20 @@ SetAccount::doApply()
         (uTxFlags & tfAllowXRP) || (uClearFlag == asfDisallowXRP)};
 
     // non legacy AccountSet flag
-    bool const bSetMinPayment =
-    (uTxFlags & tfMinPayment) || (uSetFlag == asfMinPayment);
-    bool const bClearMinPayment =
-        (uTxFlags & tfAllowMinPayment) || (uClearFlag == asfMinPayment);
+    bool const bSetDisallowIncomingMinimum{
+        (uTxFlags & tfDisallowIncomingMinimum) || (uSetFlag == asfDisallowIncomingMinimum)};
+    bool const bClearDisallowIncomingMinimum{
+        (uTxFlags & tfAllowMinIncomingMinimum) || (uClearFlag == asfDisallowIncomingMinimum)};
 
-    if (bSetMinPayment && !(uFlagsIn & lsfMinPayment))
+    if (bSetDisallowIncomingMinimum && !(uFlagsIn & lsfDisallowIncomingMinimum))
     {
-        JLOG(j_.trace()) << "Set lsfMinPayment.";
-        uFlagsOut |= lsfMinPayment;
+        JLOG(j_.trace()) << "Set lsfDisallowIncomingMinimum.";
+        uFlagsOut |= lsfDisallowIncomingMinimum;
     }
-    if (bClearMinPayment && (uFlagsIn & lsfMinPayment))
+    if (bClearDisallowIncomingMinimum && (uFlagsIn & lsfDisallowIncomingMinimum))
     {
-        JLOG(j_.trace()) << "Clear lsfMinPayment.";
-        uFlagsOut &= ~lsfMinPayment;
+        JLOG(j_.trace()) << "Clear lsfDisallowIncomingMinimum.";
+        uFlagsOut &= ~lsfDisallowIncomingMinimum;
     }
 
     bool const sigWithMaster{[&tx, &acct = account_]() {
