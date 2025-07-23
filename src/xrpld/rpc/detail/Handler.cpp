@@ -81,6 +81,10 @@ handlerFrom()
 Handler const handlerArray[]{
     // Some handlers not specified here are added to the table via addHandler()
     // Request-response methods
+
+    // Add account_balance handler
+    {"account_balance", byRef(&doAccountBalance), Role::USER, NO_CONDITION},
+    
     {"account_info", byRef(&doAccountInfo), Role::USER, NO_CONDITION},
     {"account_currencies",
      byRef(&doAccountCurrencies),

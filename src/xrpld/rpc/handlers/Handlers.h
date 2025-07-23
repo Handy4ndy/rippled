@@ -24,8 +24,13 @@
 
 namespace ripple {
 
+// Add doAccountBalance declaration
+Json::Value
+doAccountBalance(RPC::JsonContext&);
 Json::Value
 doAccountCurrencies(RPC::JsonContext&);
+Json::Value
+doAccountBalance(RPC::JsonContext&);
 Json::Value
 doAccountInfo(RPC::JsonContext&);
 Json::Value
