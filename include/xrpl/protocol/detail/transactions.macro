@@ -1125,3 +1125,31 @@ TRANSACTION(ttUNL_MODIFY, 102, UNLModify,
     {sfLedgerSequence, soeREQUIRED},
     {sfUNLModifyValidator, soeREQUIRED},
 }))
+
+/** Blacklist: set or clear a blacklist entry (Provider side) */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/blacklist/BlacklistSet.h>
+#endif
+TRANSACTION(ttBLACKLIST_SET, 200, BlacklistSet,
+    Delegation::delegable,
+    uint256{},
+    noPriv,
+    ({
+    {sfProvider, soeREQUIRED},
+    {sfBlacklisted, soeREQUIRED},
+    {sfBlacklistFlags, soeOPTIONAL},
+}))
+
+/** BlacklistTrust: Trustee registers trust for a Provider (Trustee side) */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/blacklist/BlacklistTrustSet.h>
+#endif
+TRANSACTION(ttBLACKLIST_TRUST, 201, BlacklistTrustSet,
+    Delegation::delegable,
+    uint256{},
+    noPriv,
+    ({
+    {sfOwner, soeREQUIRED},
+    {sfProvider, soeREQUIRED},
+    {sfBlacklistTrustFlags, soeOPTIONAL},
+}))

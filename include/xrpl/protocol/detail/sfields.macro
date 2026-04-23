@@ -114,6 +114,10 @@ TYPED_SFIELD(sfLateInterestRate,         UINT32,    66) // 1/10 basis points (bi
 TYPED_SFIELD(sfCloseInterestRate,        UINT32,    67) // 1/10 basis points (bips)
 TYPED_SFIELD(sfOverpaymentInterestRate,  UINT32,    68) // 1/10 basis points (bips)
 
+// Blacklist flags (Phase 0 additions)
+TYPED_SFIELD(sfBlacklistFlags,           UINT32,   100)
+TYPED_SFIELD(sfBlacklistTrustFlags,      UINT32,   101)
+
 // 64-bit integers (common)
 TYPED_SFIELD(sfIndexNext,                UINT64,     1)
 TYPED_SFIELD(sfIndexPrevious,            UINT64,     2)
@@ -324,6 +328,10 @@ TYPED_SFIELD(sfIssuingChainDoor,         ACCOUNT,   23)
 TYPED_SFIELD(sfSubject,                  ACCOUNT,   24)
 TYPED_SFIELD(sfBorrower,                 ACCOUNT,   25)
 TYPED_SFIELD(sfCounterparty,             ACCOUNT,   26)
+
+// Blacklist fields (Phase 0 additions)
+TYPED_SFIELD(sfBlacklistAccount,          ACCOUNT,   27)
+TYPED_SFIELD(sfBlacklisted,               ACCOUNT,   28)
 
 // vector of 256-bit
 TYPED_SFIELD(sfIndexes,                  VECTOR256,  1, SField::sMD_Never)

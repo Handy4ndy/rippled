@@ -605,5 +605,25 @@ LEDGER_ENTRY(ltLOAN, 0x0089, Loan, loan, ({
     {sfLoanScale,                soeDEFAULT},
 }))
 
+/** Ledger object: BlacklistEntry (Provider -> Blacklisted account) */
+LEDGER_ENTRY(ltBLACKLIST_ENTRY, 0x008a, BlacklistEntry, blacklist_entry, ({
+    {sfProvider,             soeREQUIRED},
+    {sfBlacklisted,          soeREQUIRED},
+    {sfOwnerNode,            soeREQUIRED},
+    {sfPreviousTxnID,        soeREQUIRED},
+    {sfPreviousTxnLgrSeq,    soeREQUIRED},
+    {sfFlags,                soeOPTIONAL},
+}))
+
+/** Ledger object: BlacklistTrust (Trustee -> Provider) */
+LEDGER_ENTRY(ltBLACKLIST_TRUST, 0x008b, BlacklistTrust, blacklist_trust, ({
+    {sfAccount,              soeREQUIRED},
+    {sfProvider,             soeREQUIRED},
+    {sfOwnerNode,            soeREQUIRED},
+    {sfPreviousTxnID,        soeREQUIRED},
+    {sfPreviousTxnLgrSeq,    soeREQUIRED},
+    {sfFlags,                soeOPTIONAL},
+}))
+
 #undef EXPAND
 #undef LEDGER_ENTRY_DUPLICATE
