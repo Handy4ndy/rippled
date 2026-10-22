@@ -3,7 +3,9 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/View.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/NFTokenHelpers.h>
+#include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAccount.h>  // IWYU pragma: keep
 #include <xrpl/protocol/STLedgerEntry.h>
@@ -52,6 +54,17 @@ NFTokenCreateOffer::preclaim(PreclaimContext const& ctx)
     if (hasExpired(ctx.view, ctx.tx[~sfExpiration]))
         return tecEXPIRED;
 
+    if (!ctx.tx.isFieldPresent(sfDestination))
+    {
+        auto const account = ctx.tx[sfAccount];
+        if (auto const sleSrc = ctx.view.read(keylet::account(account)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, account, sleSrc, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
+
     UInt256 const nftokenID = ctx.tx[sfNFTokenID];
     std::uint32_t const txFlags = ctx.tx.getFlags();
     if (!nft::findToken(
@@ -75,6 +88,24 @@ NFTokenCreateOffer::preclaim(PreclaimContext const& ctx)
 TER
 NFTokenCreateOffer::doApply()
 {
+    AccountID const account = ctx_.tx[sfAccount];
+    // Buy offers: creator pays. Sell offers: funds later flow destination -> creator,
+    // so do not apply creator->dest withdraw/deposit checks at create time.
+    if (!ctx_.tx.isFlag(tfSellNFToken))
+    {
+        if (auto const dest = ctx_.tx[~sfDestination])
+        {
+            auto const sleSrc = view().read(keylet::account(account));
+            if (auto err = verifyWithdrawAuth(view(), account, *dest, sleSrc, j_, 0);
+                !isTesSuccess(err))
+                return err;
+            auto const sleDst = view().read(keylet::account(*dest));
+            if (auto err = verifyDepositPreauth(ctx_.tx, view(), account, *dest, sleDst, j_);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
+
     // Use implementation shared with NFTokenMint
     return nft::tokenOfferCreateApply(
         view(),

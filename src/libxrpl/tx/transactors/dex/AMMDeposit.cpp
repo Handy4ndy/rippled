@@ -7,6 +7,7 @@
 #include <xrpl/ledger/Sandbox.h>
 #include <xrpl/ledger/helpers/AMMHelpers.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/AMMCore.h>
@@ -178,6 +179,13 @@ TER
 AMMDeposit::preclaim(PreclaimContext const& ctx)
 {
     auto const accountID = ctx.tx[sfAccount];
+
+    if (auto const sle = ctx.view.read(keylet::account(accountID)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, accountID, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     auto const ammSle = ctx.view.read(keylet::amm(ctx.tx[sfAsset], ctx.tx[sfAsset2]));
     if (!ammSle)

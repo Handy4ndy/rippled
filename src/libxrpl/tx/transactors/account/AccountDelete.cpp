@@ -30,7 +30,11 @@
 #include <xrpl/tx/transactors/delegate/DelegateSet.h>
 #include <xrpl/tx/transactors/did/DIDDelete.h>
 #include <xrpl/tx/transactors/oracle/OracleDelete.h>
+#include <xrpl/tx/transactors/payment/DepositNoauth.h>
 #include <xrpl/tx/transactors/payment/DepositPreauth.h>
+#include <xrpl/tx/transactors/payment/DepositSetauth.h>
+#include <xrpl/tx/transactors/payment/WithdrawAuthorization.h>
+#include <xrpl/tx/transactors/payment/WithdrawSetauth.h>
 
 #include <cstdint>
 #include <utility>
@@ -124,6 +128,90 @@ removeDepositPreauthFromLedger(
 }
 
 TER
+removeDepositNoauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return DepositNoauth::removeFromLedger(view, delIndex, j);
+}
+
+TER
+removeDepositSetNoauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return DepositSetauth::removeSetNoauthFromLedger(view, delIndex, j);
+}
+
+TER
+removeDepositSetPreauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return DepositSetauth::removeSetPreauthFromLedger(view, delIndex, j);
+}
+
+TER
+removeWithdrawPreauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return WithdrawAuthorization::removePreauthFromLedger(view, delIndex, j);
+}
+
+TER
+removeWithdrawNoauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return WithdrawAuthorization::removeNoauthFromLedger(view, delIndex, j);
+}
+
+TER
+removeWithdrawSetNoauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return WithdrawSetauth::removeSetNoauthFromLedger(view, delIndex, j);
+}
+
+TER
+removeWithdrawSetPreauthFromLedger(
+    ServiceRegistry&,
+    ApplyView& view,
+    AccountID const&,
+    uint256 const& delIndex,
+    SLE::Ref,
+    beast::Journal j)
+{
+    return WithdrawSetauth::removeSetPreauthFromLedger(view, delIndex, j);
+}
+
+TER
 removeNFTokenOfferFromLedger(
     ServiceRegistry&,
     ApplyView& view,
@@ -202,6 +290,20 @@ nonObligationDeleter(LedgerEntryType t)
             return removeTicketFromLedger;
         case ltDEPOSIT_PREAUTH:
             return removeDepositPreauthFromLedger;
+        case ltDEPOSIT_NOAUTH:
+            return removeDepositNoauthFromLedger;
+        case ltDEPOSIT_SET_NOAUTH:
+            return removeDepositSetNoauthFromLedger;
+        case ltDEPOSIT_SET_PREAUTH:
+            return removeDepositSetPreauthFromLedger;
+        case ltWITHDRAW_PREAUTH:
+            return removeWithdrawPreauthFromLedger;
+        case ltWITHDRAW_NOAUTH:
+            return removeWithdrawNoauthFromLedger;
+        case ltWITHDRAW_SET_NOAUTH:
+            return removeWithdrawSetNoauthFromLedger;
+        case ltWITHDRAW_SET_PREAUTH:
+            return removeWithdrawSetPreauthFromLedger;
         case ltNFTOKEN_OFFER:
             return removeNFTokenOfferFromLedger;
         case ltDID:
@@ -237,24 +339,25 @@ AccountDelete::preclaim(PreclaimContext const& ctx)
     if (auto const err = credentials::valid(ctx.tx, ctx.view, account, ctx.j); !isTesSuccess(err))
         return err;
 
-    // if credentials then postpone auth check to doApply, to check for expired
-    // credentials
-    if (!ctx.tx.isFieldPresent(sfCredentialIDs))
-    {
-        // Check whether the destination account requires deposit authorization.
-        // This also checks if destination is a pseudo-account, since pseudo-accounts have the
-        // lsfDepositAuth flag set by default
-        if (sleDst->isFlag(lsfDepositAuth))
-        {
-            if (!DepositPreauthEntryR(dst, account, ctx.view))
-                return tecNO_PERMISSION;
-        }
-    }
-
     auto const sleAccount = ctx.view.read(keylet::account(account));
     XRPL_ASSERT(sleAccount, "xrpl::AccountDelete::preclaim : non-null account");
     if (!sleAccount)
         return terNO_ACCOUNT;
+
+    // Amendment-aware deposit/withdraw checks (match doApply). With CredentialIDs,
+    // postpone deposit to doApply so expired credentials can be cleaned there.
+    {
+        std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
+        if (auto err = checkWithdrawAuth(ctx.view, account, dst, sleAccount, ctx.j, dtag);
+            !isTesSuccess(err))
+            return err;
+    }
+    if (!ctx.tx.isFieldPresent(sfCredentialIDs))
+    {
+        if (auto err = checkDepositPreauth(ctx.tx, ctx.view, account, dst, sleDst, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     // If an issuer has any issued NFTs resident in the ledger then it
     // cannot be deleted.
@@ -364,13 +467,16 @@ AccountDelete::doApply()
     if (!src || !dst)
         return tefBAD_LEDGER;  // LCOV_EXCL_LINE
 
-    if (ctx_.tx.isFieldPresent(sfCredentialIDs))
     {
-        if (auto err =
-                verifyDepositPreauth(ctx_.tx, ctx_.view(), accountID_, dstID, dst, ctx_.journal);
+        std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
+        if (auto err = verifyWithdrawAuth(ctx_.view(), accountID_, dstID, src, ctx_.journal, dtag);
             !isTesSuccess(err))
             return err;
     }
+
+    if (auto err = verifyDepositPreauth(ctx_.tx, ctx_.view(), accountID_, dstID, dst, ctx_.journal);
+        !isTesSuccess(err))
+        return err;
 
     Keylet const ownerDirKeylet{keylet::ownerDir(accountID_)};
     auto const ter = cleanupOnAccountDelete(

@@ -129,6 +129,19 @@ VaultWithdraw::preclaim(PreclaimContext const& ctx)
     auto const& vaultAccount = vault->at(sfAccount);
     auto const& account = ctx.tx[sfAccount];
     auto const& dstAcct = ctx.tx[~sfDestination].value_or(account);
+
+    // Soft allow-mode: block uncontrolled self-path in preclaim.
+    // Directed withdraw dest policy is in doApply (needs ApplyView).
+    if (dstAcct == account)
+    {
+        if (auto const sleSrc = ctx.view.read(keylet::account(account)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, account, sleSrc, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
+
     // Post-fixCleanup3_2_0: withdraw is a recovery path that bypasses the
     // lsfMPTCanTransfer flag check, so an issuer cannot trap depositor funds.
     // Other transferability checks (IOU NoRipple, freeze, requireAuth) still
@@ -308,6 +321,19 @@ VaultWithdraw::doApply()
     if (!vault)
         return tefINTERNAL;  // LCOV_EXCL_LINE
 
+    auto const dstAcct = ctx_.tx[~sfDestination].value_or(accountID_);
+    if (dstAcct != accountID_)
+    {
+        auto const sleSrc = view().read(keylet::account(accountID_));
+        if (auto err = verifyWithdrawAuth(view(), accountID_, dstAcct, sleSrc, j_, 0);
+            !isTesSuccess(err))
+            return err;
+        auto const sleDst = view().read(keylet::account(dstAcct));
+        if (auto err = verifyDepositPreauth(ctx_.tx, view(), accountID_, dstAcct, sleDst, j_);
+            !isTesSuccess(err))
+            return err;
+    }
+
     auto const mptIssuanceID = *(*vault)[sfShareMPTID];
     auto const sleIssuance = view().read(keylet::mptokenIssuance(mptIssuanceID));
     if (!sleIssuance)
@@ -327,7 +353,6 @@ VaultWithdraw::doApply()
 
     auto const amount = ctx_.tx[sfAmount];
     Asset const vaultAsset = vault->at(sfAsset);
-    auto const dstAcct = ctx_.tx[~sfDestination].value_or(accountID_);
     auto const rate = withdrawalTransferRate(view(), accountID_, dstAcct, vaultAsset);
 
     MPTIssue const share{mptIssuanceID};

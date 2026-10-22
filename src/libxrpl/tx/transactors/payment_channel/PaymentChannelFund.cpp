@@ -5,6 +5,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/PaymentChannelHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -105,9 +106,23 @@ PaymentChannelFund::doApply()
     }
 
     // do not allow adding funds if dst does not exist
-    if (AccountID const dst = (*slep)[sfDestination]; !ctx_.view().read(keylet::account(dst)))
+    AccountID const dst = (*slep)[sfDestination];
+    if (!ctx_.view().read(keylet::account(dst)))
     {
         return tecNO_DST;
+    }
+
+    // Soft outbound policy to the channel destination when adding funds.
+    {
+        std::uint32_t const dtag = slep->at(~sfDestinationTag).valueOr(0);
+        if (auto err = verifyWithdrawAuth(ctx_.view(), txAccount, dst, sle, j_, dtag);
+            !isTesSuccess(err))
+            return err;
+        auto const sleDst = ctx_.view().read(keylet::account(dst));
+        if (auto err = checkDepositPreauth(
+                ctx_.tx, ctx_.view(), txAccount, dst, sleDst, j_, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
     }
 
     (*slep)[sfAmount] = (*slep)[sfAmount] + ctx_.tx[sfAmount];

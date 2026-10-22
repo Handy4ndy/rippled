@@ -45,7 +45,8 @@ public:
         if (this->exists() && (*this)->isFieldPresent(sfAmendments))
         {
             auto const& v = (*this)->getFieldV256(sfAmendments);
-            amendments.insert_range(v);
+            // insert_range is libstdc++ from GCC 15. This tree builds with GCC 13.
+            amendments.insert(v.begin(), v.end());
         }
 
         return amendments;

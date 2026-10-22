@@ -215,6 +215,75 @@ depositPreauth(UInt256 const& key) noexcept
 }
 /** @} */
 
+/** A DepositNoauth */
+/** @{ */
+Keylet
+depositNoauth(AccountID const& owner, AccountID const& denied) noexcept;
+
+inline Keylet
+depositNoauth(uint256 const& key) noexcept
+{
+    return {ltDEPOSIT_NOAUTH, key};
+}
+/** @} */
+
+Keylet
+depositSetNoauth(AccountID const& owner) noexcept;
+
+inline Keylet
+depositSetNoauth(uint256 const& key) noexcept
+{
+    return {ltDEPOSIT_SET_NOAUTH, key};
+}
+
+Keylet
+depositSetPreauth(AccountID const& owner) noexcept;
+
+inline Keylet
+depositSetPreauth(uint256 const& key) noexcept
+{
+    return {ltDEPOSIT_SET_PREAUTH, key};
+}
+
+Keylet
+withdrawPreauth(
+    AccountID const& owner,
+    AccountID const& authorized,
+    std::uint32_t destinationTag = 0) noexcept;
+
+inline Keylet
+withdrawPreauth(uint256 const& key) noexcept
+{
+    return {ltWITHDRAW_PREAUTH, key};
+}
+
+Keylet
+withdrawNoauth(AccountID const& owner, AccountID const& denied) noexcept;
+
+inline Keylet
+withdrawNoauth(uint256 const& key) noexcept
+{
+    return {ltWITHDRAW_NOAUTH, key};
+}
+
+Keylet
+withdrawSetNoauth(AccountID const& owner) noexcept;
+
+inline Keylet
+withdrawSetNoauth(uint256 const& key) noexcept
+{
+    return {ltWITHDRAW_SET_NOAUTH, key};
+}
+
+Keylet
+withdrawSetPreauth(AccountID const& owner) noexcept;
+
+inline Keylet
+withdrawSetPreauth(uint256 const& key) noexcept
+{
+    return {ltWITHDRAW_SET_PREAUTH, key};
+}
+
 //------------------------------------------------------------------------------
 
 /**
@@ -412,7 +481,7 @@ struct KeyletDesc
 };
 
 // This list should include all of the keylet functions that take a single AccountID parameter.
-extern std::array<KeyletDesc<AccountID const&>, 6> const kDirectAccountKeylets;
+extern std::array<KeyletDesc<AccountID const&>, 10> const kDirectAccountKeylets;
 
 MPTID
 makeMptID(std::uint32_t const sequence, AccountID const& account);

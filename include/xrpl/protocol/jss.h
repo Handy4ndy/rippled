@@ -68,6 +68,7 @@ JSS(Paths);                       // in/out: TransactionSign
 JSS(PriceDataSeries);             // field.
 JSS(PriceData);                   // field.
 JSS(Provider);                    // field.
+JSS(providers);                   // field: sfProviders array (RPC output)
 JSS(QuoteAsset);                  // in: Oracle.
 JSS(RawTransaction);              // in: Batch
 JSS(RawTransactions);             // in: Batch
@@ -657,6 +658,7 @@ JSS(txs);                         // out: TxHistory
 JSS(type);                        // in: AccountObjects
                                   // out: NetworkOPs, RPC server_definitions OverlayImpl, Logic
 JSS(type_hex);                    // out: STPathSet
+JSS(unauthorized);                // in: ledger_entry DepositNoauth / WithdrawNoauth
 JSS(unl);                         // out: UnlList
 JSS(unlimited);                   // out: Connection.h
 JSS(uptime);                      // out: GetCounts

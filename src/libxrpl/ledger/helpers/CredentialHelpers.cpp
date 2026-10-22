@@ -9,6 +9,7 @@
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/entries/DepositPreauthEntry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/DirectoryHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
@@ -368,6 +369,15 @@ verifyValidDomain(ApplyView& view, AccountID const& account, UInt256 domainID, b
     return *foundExpired ? tecEXPIRED : tecNO_PERMISSION;
 }
 
+static bool
+depositNoauthLive(ReadView const& view, Keylet const& noauthKey)
+{
+    auto const sleNoauth = view.read(noauthKey);
+    if (!sleNoauth)
+        return false;
+    return !credentials::checkExpired(*sleNoauth, view.header().parentCloseTime);
+}
+
 TER
 checkDepositPreauth(
     STTx const& tx,
@@ -375,26 +385,55 @@ checkDepositPreauth(
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleDst,
-    beast::Journal j)
+    beast::Journal j,
+    bool skipAllowForUnwedge)
 {
-    // If depositPreauth is enabled, then an account that requires
-    // authorization has at least two ways to get a payment in:
-    //  1. If src == dst, or
-    //  2. If src is deposit preauthorized by dst (either by account or by
-    //  credentials).
+    if (!sleDst || src == dst)
+        return tesSUCCESS;
 
-    if (sleDst && ((sleDst->getFlags() & lsfDepositAuth) != 0u))
+    bool const paymentPolicy = view.rules().enabled(featurePaymentPolicy);
+
+    if (paymentPolicy && ((sleDst->getFlags() & lsfDepositNoauth) != 0u))
     {
-        if (src != dst)
+        if (depositNoauthLive(view, keylet::depositNoauth(dst, src)))
+            return tecDEPOSIT_NOAUTH;
+
+        if (auto const sleSetNoauth = view.read(keylet::depositSetNoauth(dst)))
         {
-            if (!DepositPreauthEntryR(dst, src, view))
+            for (auto const& entry : sleSetNoauth->getFieldArray(sfProviders))
             {
-                return !tx.isFieldPresent(sfCredentialIDs)
-                    ? tecNO_PERMISSION
-                    : credentials::authorizedDepositPreauth(
-                          view, tx.getFieldV256(sfCredentialIDs), dst);
+                AccountID const provider = entry.getAccountID(sfAccount);
+                if (depositNoauthLive(view, keylet::depositNoauth(provider, src)))
+                    return tecDEPOSIT_NOAUTH;
             }
         }
+    }
+
+    if (skipAllowForUnwedge)
+        return tesSUCCESS;
+
+    if ((sleDst->getFlags() & lsfDepositAuth) != 0u)
+    {
+        if (DepositPreauthEntryR(dst, src, view))
+            return tesSUCCESS;
+
+        if (paymentPolicy)
+        {
+            if (auto const sleSetPreauth = view.read(keylet::depositSetPreauth(dst)))
+            {
+                for (auto const& entry : sleSetPreauth->getFieldArray(sfProviders))
+                {
+                    AccountID const provider = entry.getAccountID(sfAccount);
+                    if (DepositPreauthEntryR(provider, src, view))
+                        return tesSUCCESS;
+                }
+            }
+        }
+
+        return !tx.isFieldPresent(sfCredentialIDs)
+            ? tecNO_PERMISSION
+            : credentials::authorizedDepositPreauth(
+                  view, tx.getFieldV256(sfCredentialIDs), dst);
     }
 
     return tesSUCCESS;
@@ -416,6 +455,54 @@ cleanupExpiredCredentials(STTx const& tx, ApplyView& view, beast::Journal j)
     return tesSUCCESS;
 }
 
+static TER
+eraseExpiredNoauth(
+    ApplyView& view,
+    SLE::Ref sleNoauth,
+    Keylet const& noauthKey,
+    beast::Journal j)
+{
+    AccountID const account = sleNoauth->getAccountID(sfAccount);
+    std::uint64_t const page = sleNoauth->getFieldU64(sfOwnerNode);
+    if (!view.dirRemove(keylet::ownerDir(account), page, noauthKey.key, false))
+    {
+        JLOG(j.error()) << "expire noauth: failed dirRemove " << to_string(noauthKey.key);
+        return tefBAD_LEDGER;
+    }
+    auto const sleOwner = view.peek(keylet::account(account));
+    if (!sleOwner)
+        return tesSUCCESS;
+    decreaseOwnerCountForObject(view, sleOwner, sleNoauth, 1, j);
+    view.erase(sleNoauth);
+    return tesSUCCESS;
+}
+
+static TER
+expireDepositNoauthIfNeeded(ApplyView& view, Keylet const& noauthKey, beast::Journal j)
+{
+    auto const sleNoauth = view.peek(noauthKey);
+    if (!sleNoauth)
+        return tesSUCCESS;
+
+    if (!credentials::checkExpired(*sleNoauth, view.header().parentCloseTime))
+        return tecDEPOSIT_NOAUTH;
+
+    return eraseExpiredNoauth(view, sleNoauth, noauthKey, j);
+}
+
+static TER
+expireWithdrawNoauthIfNeeded(ApplyView& view, Keylet const& noauthKey, beast::Journal j)
+{
+    auto const sleNoauth = view.peek(noauthKey);
+    if (!sleNoauth)
+        return tesSUCCESS;
+
+    if (!credentials::checkExpired(*sleNoauth, view.header().parentCloseTime))
+        return tecWITHDRAW_NOAUTH;
+
+    return eraseExpiredNoauth(view, sleNoauth, noauthKey, j);
+}
+
 TER
 verifyDepositPreauth(
     STTx const& tx,
@@ -423,12 +510,172 @@ verifyDepositPreauth(
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleDst,
-    beast::Journal j)
+    beast::Journal j,
+    bool skipAllowForUnwedge)
 {
     if (auto const err = cleanupExpiredCredentials(tx, view, j); !isTesSuccess(err))
         return err;
 
-    return checkDepositPreauth(tx, view, src, dst, sleDst, j);
+    if (!sleDst || src == dst)
+        return tesSUCCESS;
+
+    bool const paymentPolicy = view.rules().enabled(featurePaymentPolicy);
+
+    if (paymentPolicy && ((sleDst->getFlags() & lsfDepositNoauth) != 0u))
+    {
+        if (auto const ter = expireDepositNoauthIfNeeded(view, keylet::depositNoauth(dst, src), j);
+            !isTesSuccess(ter))
+            return ter;
+
+        if (auto const sleSetNoauth = view.peek(keylet::depositSetNoauth(dst)))
+        {
+            for (auto const& entry : sleSetNoauth->getFieldArray(sfProviders))
+            {
+                AccountID const provider = entry.getAccountID(sfAccount);
+                if (auto const ter =
+                        expireDepositNoauthIfNeeded(view, keylet::depositNoauth(provider, src), j);
+                    !isTesSuccess(ter))
+                    return ter;
+            }
+        }
+    }
+
+    if (skipAllowForUnwedge)
+        return tesSUCCESS;
+
+    return checkDepositPreauth(tx, view, src, dst, sleDst, j, false);
+}
+
+static bool
+withdrawNoauthLive(ReadView const& view, Keylet const& noauthKey)
+{
+    auto const sleNoauth = view.read(noauthKey);
+    if (!sleNoauth)
+        return false;
+    return !credentials::checkExpired(*sleNoauth, view.header().parentCloseTime);
+}
+
+TER
+checkWithdrawAuth(
+    ReadView const& view,
+    AccountID const& src,
+    AccountID const& dst,
+    SLE::ConstRef sleSrc,
+    beast::Journal j,
+    std::uint32_t destinationTag)
+{
+    if (!sleSrc || src == dst)
+        return tesSUCCESS;
+
+    if (!view.rules().enabled(featurePaymentPolicy))
+        return tesSUCCESS;
+
+    bool const denyMode = (sleSrc->getFlags() & lsfWithdrawNoauth) != 0u;
+    bool const allowMode = (sleSrc->getFlags() & lsfWithdrawAuth) != 0u;
+
+    if (denyMode)
+    {
+        if (withdrawNoauthLive(view, keylet::withdrawNoauth(src, dst)))
+            return tecWITHDRAW_NOAUTH;
+        if (auto const sleSet = view.read(keylet::withdrawSetNoauth(src)))
+        {
+            for (auto const& entry : sleSet->getFieldArray(sfProviders))
+            {
+                AccountID const provider = entry.getAccountID(sfAccount);
+                if (withdrawNoauthLive(view, keylet::withdrawNoauth(provider, dst)))
+                    return tecWITHDRAW_NOAUTH;
+            }
+        }
+    }
+
+    if (allowMode)
+    {
+        if (view.exists(keylet::withdrawPreauth(src, dst, destinationTag)))
+            return tesSUCCESS;
+        if (auto const sleSet = view.read(keylet::withdrawSetPreauth(src)))
+        {
+            for (auto const& entry : sleSet->getFieldArray(sfProviders))
+            {
+                AccountID const provider = entry.getAccountID(sfAccount);
+                if (view.exists(keylet::withdrawPreauth(provider, dst, destinationTag)))
+                    return tesSUCCESS;
+            }
+        }
+        return tecNO_PERMISSION;
+    }
+
+    return tesSUCCESS;
+}
+
+TER
+verifyWithdrawAuth(
+    ApplyView& view,
+    AccountID const& src,
+    AccountID const& dst,
+    SLE::ConstRef sleSrc,
+    beast::Journal j,
+    std::uint32_t destinationTag)
+{
+    if (!sleSrc || src == dst)
+        return tesSUCCESS;
+
+    if (!view.rules().enabled(featurePaymentPolicy))
+        return tesSUCCESS;
+
+    if ((sleSrc->getFlags() & lsfWithdrawNoauth) != 0u)
+    {
+        if (auto const ter = expireWithdrawNoauthIfNeeded(view, keylet::withdrawNoauth(src, dst), j);
+            !isTesSuccess(ter))
+            return ter;
+        if (auto const sleSet = view.read(keylet::withdrawSetNoauth(src)))
+        {
+            for (auto const& entry : sleSet->getFieldArray(sfProviders))
+            {
+                AccountID const provider = entry.getAccountID(sfAccount);
+                if (auto const ter = expireWithdrawNoauthIfNeeded(
+                        view, keylet::withdrawNoauth(provider, dst), j);
+                    !isTesSuccess(ter))
+                    return ter;
+            }
+        }
+    }
+
+    return checkWithdrawAuth(view, src, dst, sleSrc, j, destinationTag);
+}
+
+TER
+verifyUncontrolledValueExit(
+    ReadView const& view,
+    AccountID const& account,
+    SLE::ConstRef sleSrc,
+    beast::Journal j)
+{
+    if (!sleSrc || !view.rules().enabled(featurePaymentPolicy))
+        return tesSUCCESS;
+
+    auto const flags = sleSrc->getFlags();
+    if ((flags & lsfWithdrawAuth) != 0u || (flags & lsfWithdrawNoauth) != 0u)
+    {
+        JLOG(j.trace()) << "Withdraw policy: uncontrolled value exit blocked for "
+                        << to_string(account);
+        return tecNO_PERMISSION;
+    }
+
+    return tesSUCCESS;
+}
+
+bool
+accountBlocksUncontrolledExit(ReadView const& view, AccountID const& account)
+{
+    if (!view.rules().enabled(featurePaymentPolicy))
+        return false;
+
+    auto const sle = view.read(keylet::account(account));
+    if (!sle)
+        return false;
+
+    auto const flags = sle->getFlags();
+    return (flags & lsfWithdrawAuth) != 0u || (flags & lsfWithdrawNoauth) != 0u;
 }
 
 }  // namespace xrpl

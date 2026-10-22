@@ -405,6 +405,42 @@ AccountSet::doApply()
         uFlagsOut &= ~lsfDepositAuth;
     }
 
+    if (view().rules().enabled(featurePaymentPolicy))
+    {
+        if (uSetFlag == asfDepositNoauth)
+        {
+            JLOG(j_.trace()) << "Set lsfDepositNoauth.";
+            uFlagsOut |= lsfDepositNoauth;
+        }
+        else if (uClearFlag == asfDepositNoauth)
+        {
+            JLOG(j_.trace()) << "Clear lsfDepositNoauth.";
+            uFlagsOut &= ~lsfDepositNoauth;
+        }
+
+        if (uSetFlag == asfWithdrawAuth)
+        {
+            JLOG(j_.trace()) << "Set lsfWithdrawAuth.";
+            uFlagsOut |= lsfWithdrawAuth;
+        }
+        else if (uClearFlag == asfWithdrawAuth)
+        {
+            JLOG(j_.trace()) << "Clear lsfWithdrawAuth.";
+            uFlagsOut &= ~lsfWithdrawAuth;
+        }
+
+        if (uSetFlag == asfWithdrawNoauth)
+        {
+            JLOG(j_.trace()) << "Set lsfWithdrawNoauth.";
+            uFlagsOut |= lsfWithdrawNoauth;
+        }
+        else if (uClearFlag == asfWithdrawNoauth)
+        {
+            JLOG(j_.trace()) << "Clear lsfWithdrawNoauth.";
+            uFlagsOut &= ~lsfWithdrawNoauth;
+        }
+    }
+
     //
     // EmailHash
     //

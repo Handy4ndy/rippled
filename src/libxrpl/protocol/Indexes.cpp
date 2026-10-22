@@ -34,34 +34,31 @@ namespace xrpl {
 // This list should include all of the keylet functions that take a single
 // AccountID parameter. Declared in Indexes.h; defined here so the header need
 // not include jss.h.
-std::array<KeyletDesc<AccountID const&>, 6> const kDirectAccountKeylets{
-    {
-        {.function = &keylet::account, .expectedLEName = jss::AccountRoot, .includeInTests = false},
-        {
-            .function = &keylet::ownerDir,
-            .expectedLEName = jss::DirectoryNode,
-            .includeInTests = true,
-        },
-        {
-            .function = &keylet::signerList,
-            .expectedLEName = jss::SignerList,
-            .includeInTests = true,
-        },
-        // It's normally impossible to create an item at nftpage_min, but
-        // test it anyway, since the invariant checks for it.
-        {
-            .function = &keylet::nftokenPageMin,
-            .expectedLEName = jss::NFTokenPage,
-            .includeInTests = true,
-        },
-        {
-            .function = &keylet::nftokenPageMax,
-            .expectedLEName = jss::NFTokenPage,
-            .includeInTests = true,
-        },
-        {.function = &keylet::did, .expectedLEName = jss::DID, .includeInTests = true},
-    },
-};
+std::array<KeyletDesc<AccountID const&>, 10> const kDirectAccountKeylets{
+    {{.function = &keylet::account, .expectedLEName = jss::AccountRoot, .includeInTests = false},
+     {.function = &keylet::ownerDir, .expectedLEName = jss::DirectoryNode, .includeInTests = true},
+     {.function = &keylet::signerList, .expectedLEName = jss::SignerList, .includeInTests = true},
+     // It's normally impossible to create an item at nftpage_min, but
+     // test it anyway, since the invariant checks for it.
+     {.function = &keylet::nftokenPageMin,
+      .expectedLEName = jss::NFTokenPage,
+      .includeInTests = true},
+     {.function = &keylet::nftokenPageMax,
+      .expectedLEName = jss::NFTokenPage,
+      .includeInTests = true},
+     {.function = &keylet::did, .expectedLEName = jss::DID, .includeInTests = true},
+     {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::depositSetNoauth),
+      .expectedLEName = jss::DepositSetNoauth,
+      .includeInTests = true},
+     {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::depositSetPreauth),
+      .expectedLEName = jss::DepositSetPreauth,
+      .includeInTests = true},
+     {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::withdrawSetNoauth),
+      .expectedLEName = jss::WithdrawSetNoauth,
+      .includeInTests = true},
+     {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::withdrawSetPreauth),
+      .expectedLEName = jss::WithdrawSetPreauth,
+      .includeInTests = true}}};
 
 /**
  * Type-specific prefix for calculating ledger indices.
@@ -115,6 +112,14 @@ enum class LedgerNameSpace : std::uint16_t {
     Loan = 'L',
     Sponsorship = '>',
     TransactionProposal = 'y',
+    DepositNoauth = 'k',
+    DepositSetNoauth = 'w',
+    DepositSetPreauth = 'W',
+    // 'y' is TransactionProposal. 'o' is Offer. 'F' stays free for Firewall.
+    WithdrawPreauth = 'b',
+    WithdrawNoauth = 'z',
+    WithdrawSetNoauth = 'j',
+    WithdrawSetPreauth = 'J',
 
     // No longer used or supported. Left here to reserve the space to avoid accidental reuse.
     Contract [[deprecated]] = 'c',
@@ -401,6 +406,53 @@ depositPreauth(
 
     return {
         ltDEPOSIT_PREAUTH, indexHash(LedgerNameSpace::DepositPreauthCredentials, owner, hashes)};
+}
+
+Keylet
+depositNoauth(AccountID const& owner, AccountID const& denied) noexcept
+{
+    return {ltDEPOSIT_NOAUTH, indexHash(LedgerNameSpace::DepositNoauth, owner, denied)};
+}
+
+Keylet
+depositSetNoauth(AccountID const& owner) noexcept
+{
+    return {ltDEPOSIT_SET_NOAUTH, indexHash(LedgerNameSpace::DepositSetNoauth, owner)};
+}
+
+Keylet
+depositSetPreauth(AccountID const& owner) noexcept
+{
+    return {ltDEPOSIT_SET_PREAUTH, indexHash(LedgerNameSpace::DepositSetPreauth, owner)};
+}
+
+Keylet
+withdrawPreauth(
+    AccountID const& owner,
+    AccountID const& authorized,
+    std::uint32_t destinationTag) noexcept
+{
+    return {
+        ltWITHDRAW_PREAUTH,
+        indexHash(LedgerNameSpace::WithdrawPreauth, owner, authorized, destinationTag)};
+}
+
+Keylet
+withdrawNoauth(AccountID const& owner, AccountID const& denied) noexcept
+{
+    return {ltWITHDRAW_NOAUTH, indexHash(LedgerNameSpace::WithdrawNoauth, owner, denied)};
+}
+
+Keylet
+withdrawSetNoauth(AccountID const& owner) noexcept
+{
+    return {ltWITHDRAW_SET_NOAUTH, indexHash(LedgerNameSpace::WithdrawSetNoauth, owner)};
+}
+
+Keylet
+withdrawSetPreauth(AccountID const& owner) noexcept
+{
+    return {ltWITHDRAW_SET_PREAUTH, indexHash(LedgerNameSpace::WithdrawSetPreauth, owner)};
 }
 
 //------------------------------------------------------------------------------

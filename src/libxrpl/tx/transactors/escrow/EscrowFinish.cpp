@@ -282,6 +282,7 @@ EscrowFinish::doApply()
         return tecNO_PERMISSION;
 
     AccountID const destID = (*escrow)[sfDestination];
+    AccountID const ownerID = (*escrow)[sfAccount];
     auto const sled = ctx_.view().peek(keylet::account(destID));
     if (ctx_.view().rules().enabled(featureSmartEscrow))
     {
@@ -289,8 +290,17 @@ EscrowFinish::doApply()
         if (!sled)
             return tecNO_DST;
 
+        // Locked funds belong to the escrow owner, not the finish submitter.
+        {
+            auto const sleSrc = ctx_.view().read(keylet::account(ownerID));
+            std::uint32_t const dtag = (*escrow)[~sfDestinationTag].valueOr(0);
+            if (auto err =
+                    verifyWithdrawAuth(ctx_.view(), ownerID, destID, sleSrc, ctx_.journal, dtag);
+                !isTesSuccess(err))
+                return err;
+        }
         if (auto err =
-                verifyDepositPreauth(ctx_.tx, ctx_.view(), accountID_, destID, sled, ctx_.journal);
+                verifyDepositPreauth(ctx_.tx, ctx_.view(), ownerID, destID, sled, ctx_.journal);
             !isTesSuccess(err))
             return err;
     }
@@ -354,8 +364,17 @@ EscrowFinish::doApply()
         if (!sled)
             return tecNO_DST;
 
+        {
+            auto const sleSrc = ctx_.view().read(keylet::account(ownerID));
+            std::uint32_t const dtag = (*escrow)[~sfDestinationTag].valueOr(0);
+            if (auto err =
+                    verifyWithdrawAuth(ctx_.view(), ownerID, destID, sleSrc, ctx_.journal, dtag);
+                !isTesSuccess(err))
+                return err;
+        }
+
         if (auto err =
-                verifyDepositPreauth(ctx_.tx, ctx_.view(), accountID_, destID, sled, ctx_.journal);
+                verifyDepositPreauth(ctx_.tx, ctx_.view(), ownerID, destID, sled, ctx_.journal);
             !isTesSuccess(err))
             return err;
     }

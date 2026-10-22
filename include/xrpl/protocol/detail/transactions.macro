@@ -210,6 +210,7 @@ TRANSACTION(ttPAYCHAN_CLAIM, 15, PaymentChannelClaim, ({.delegable = Delegation:
     {sfSignature, SoeOptional},
     {sfPublicKey, SoeOptional},
     {sfCredentialIDs, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type creates a new check. */
@@ -281,6 +282,18 @@ TRANSACTION(ttACCOUNT_DELETE, 21, AccountDelete,
 
 // 22 reserved
 
+/** Grant or revoke inbound deny (blacklist) authorization. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/DepositNoauth.h>
+#endif
+TRANSACTION(ttDEPOSIT_NOAUTH, 23, DepositNoauth,
+    ({.delegable = Delegation::Delegable, .amendment = featurePaymentPolicy}),
+    ({
+    {sfAuthorize, SoeOptional},
+    {sfUnauthorize, SoeOptional},
+    {sfExpiration, SoeOptional},
+}))
+
 /** This transaction mints a new NFT. */
 #if TRANSACTION_INCLUDE
 #   include <xrpl/tx/transactors/nft/NFTokenMint.h>
@@ -295,6 +308,7 @@ TRANSACTION(ttNFTOKEN_MINT, 25, NFTokenMint,
     {sfAmount, SoeOptional},
     {sfDestination, SoeOptional},
     {sfExpiration, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction burns (i.e. destroys) an existing NFT. */
@@ -395,6 +409,7 @@ TRANSACTION(ttAMM_DEPOSIT, 36, AMMDeposit,
     {sfEPrice, SoeOptional},
     {sfLPTokenOut, SoeOptional},
     {sfTradingFee, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type withdraws from an AMM instance */
@@ -414,6 +429,7 @@ TRANSACTION(ttAMM_WITHDRAW, 37, AMMWithdraw,
     {sfAmount2, SoeOptional, SoeMptSupported},
     {sfEPrice, SoeOptional},
     {sfLPTokenIn, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type votes for the trading fee */
@@ -440,6 +456,7 @@ TRANSACTION(ttAMM_BID, 39, AMMBid,
     {sfBidMin, SoeOptional},
     {sfBidMax, SoeOptional},
     {sfAuthAccounts, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type deletes AMM in the empty state */
@@ -823,6 +840,7 @@ TRANSACTION(ttLOAN_BROKER_COVER_DEPOSIT, 76, LoanBrokerCoverDeposit,
     ({
     {sfLoanBrokerID, SoeRequired},
     {sfAmount, SoeRequired, SoeMptSupported},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction withdraws First Loss Capital from a Loan Broker */
@@ -840,6 +858,7 @@ TRANSACTION(ttLOAN_BROKER_COVER_WITHDRAW, 77, LoanBrokerCoverWithdraw,
     {sfDestination, SoeOptional},
     {sfDestinationTag, SoeOptional},
     {sfCredentialIDs, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction claws back First Loss Capital from a Loan Broker to
@@ -925,6 +944,7 @@ TRANSACTION(ttLOAN_PAY, 84, LoanPay,
     ({
     {sfLoanID, SoeRequired},
     {sfAmount, SoeRequired, SoeMptSupported},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type converts into confidential MPT balance. */
@@ -1131,4 +1151,48 @@ TRANSACTION(ttUNL_MODIFY, 102, UNLModify,
     {sfUNLModifyDisabling, SoeRequired},
     {sfLedgerSequence, SoeRequired},
     {sfUNLModifyValidator, SoeRequired},
+}))
+
+/** Trustee subscribes to provider DepositNoauth / DepositPreauth lists. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/DepositSetauth.h>
+#endif
+TRANSACTION(ttDEPOSIT_SETAUTH, 103, DepositSetauth,
+    ({.delegable = Delegation::Delegable, .amendment = featurePaymentPolicy}),
+    ({
+    {sfProviders, SoeOptional},
+}))
+
+/** Authorize (or de-authorize) an account to receive outgoing payments. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/WithdrawPreauth.h>
+#endif
+TRANSACTION(ttWITHDRAW_PREAUTH, 104, WithdrawPreauth,
+    ({.delegable = Delegation::NotDelegable, .amendment = featurePaymentPolicy}),
+    ({
+    {sfAuthorize, SoeOptional},
+    {sfUnauthorize, SoeOptional},
+    {sfDestinationTag, SoeOptional},
+}))
+
+/** Deny (or remove the denial of) an account from receiving outgoing payments. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/WithdrawNoauth.h>
+#endif
+TRANSACTION(ttWITHDRAW_NOAUTH, 105, WithdrawNoauth,
+    ({.delegable = Delegation::Delegable, .amendment = featurePaymentPolicy}),
+    ({
+    {sfAuthorize, SoeOptional},
+    {sfUnauthorize, SoeOptional},
+    {sfExpiration, SoeOptional},
+}))
+
+/** Outbound provider Setauth (mirror of DepositSetauth). */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/WithdrawSetauth.h>
+#endif
+TRANSACTION(ttWITHDRAW_SETAUTH, 106, WithdrawSetauth,
+    ({.delegable = Delegation::NotDelegable, .amendment = featurePaymentPolicy}),
+    ({
+    {sfProviders, SoeOptional},
 }))

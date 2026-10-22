@@ -89,8 +89,9 @@ checkDepositPreauth(
     ReadView const& view,
     AccountID const& src,
     AccountID const& dst,
-    std::shared_ptr<SLE const> const& sleDst,
-    beast::Journal j);
+    SLE::ConstRef sleDst,
+    beast::Journal j,
+    bool skipAllowForUnwedge = false);
 
 /**
  * @brief Remove expired credentials referenced by the transaction.
@@ -104,7 +105,9 @@ checkDepositPreauth(
 TER
 cleanupExpiredCredentials(STTx const& tx, ApplyView& view, beast::Journal j);
 
-// Check expired credentials and for existing DepositPreauth ledger object
+// Check expired credentials and deposit policy (deny-first, then allow).
+// If skipAllowForUnwedge is true, only inbound deny is enforced (classic
+// DepositAuth unwedge must not skip DepositNoauth).
 TER
 verifyDepositPreauth(
     STTx const& tx,
@@ -112,6 +115,35 @@ verifyDepositPreauth(
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleDst,
+    beast::Journal j,
+    bool skipAllowForUnwedge = false);
+
+TER
+checkWithdrawAuth(
+    ReadView const& view,
+    AccountID const& src,
+    AccountID const& dst,
+    SLE::ConstRef sleSrc,
+    beast::Journal j,
+    std::uint32_t destinationTag = 0);
+
+TER
+verifyWithdrawAuth(
+    ApplyView& view,
+    AccountID const& src,
+    AccountID const& dst,
+    SLE::ConstRef sleSrc,
+    beast::Journal j,
+    std::uint32_t destinationTag = 0);
+
+TER
+verifyUncontrolledValueExit(
+    ReadView const& view,
+    AccountID const& account,
+    SLE::ConstRef sleSrc,
     beast::Journal j);
+
+bool
+accountBlocksUncontrolledExit(ReadView const& view, AccountID const& account);
 
 }  // namespace xrpl

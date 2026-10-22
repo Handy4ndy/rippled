@@ -5,6 +5,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/ledger/ReadView.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/ConfidentialTransfer.h>
 #include <xrpl/protocol/Feature.h>
@@ -152,6 +153,13 @@ ConfidentialMPTConvertBack::preclaim(PreclaimContext const& ctx)
     auto const mptIssuanceID = ctx.tx[sfMPTokenIssuanceID];
     auto const account = ctx.tx[sfAccount];
     auto const amount = ctx.tx[sfMPTAmount];
+
+    if (auto const sle = ctx.view.read(keylet::account(account)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, account, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     // ensure that issuance exists
     auto const sleIssuance = ctx.view.read(keylet::mptokenIssuance(mptIssuanceID));

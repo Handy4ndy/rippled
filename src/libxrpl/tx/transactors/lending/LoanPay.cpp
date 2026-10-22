@@ -7,6 +7,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/json/to_string.h>
 #include <xrpl/ledger/ReadView.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/LendingHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/ledger/helpers/VaultHelpers.h>
@@ -251,6 +252,13 @@ LoanPay::preclaim(PreclaimContext const& ctx)
     auto const account = tx[sfAccount];
     auto const loanID = tx[sfLoanID];
     auto const amount = tx[sfAmount];
+
+    if (auto const sle = ctx.view.read(keylet::account(account)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, account, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     auto const loanSle = ctx.view.read(keylet::loan(loanID));
     if (!loanSle)

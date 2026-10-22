@@ -6,6 +6,7 @@
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/entries/CheckEntry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
@@ -96,6 +97,18 @@ CheckCreate::preclaim(PreclaimContext const& ctx)
     // currently active amendments.
     if (isPseudoAccount(sleDst))
         return tecNO_PERMISSION;
+
+    {
+        auto const sleSrc = ctx.view.read(keylet::account(srcId));
+        std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
+        if (auto err = checkWithdrawAuth(ctx.view, srcId, dstId, sleSrc, ctx.j, dtag);
+            !isTesSuccess(err))
+            return err;
+        if (auto err = checkDepositPreauth(
+                ctx.tx, ctx.view, srcId, dstId, sleDst, ctx.j, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
 
     if (sleDst->isFlag(lsfRequireDestTag) && !ctx.tx.isFieldPresent(sfDestinationTag))
     {
@@ -207,6 +220,19 @@ CheckCreate::doApply()
 
     sleCheck->setAccountID(sfAccount, accountID_);
     AccountID const dstAccountId = ctx_.tx[sfDestination];
+    {
+        auto const sleDst = view().read(keylet::account(dstAccountId));
+        if (auto err = checkDepositPreauth(
+                ctx_.tx,
+                view(),
+                accountID_,
+                dstAccountId,
+                sleDst,
+                j_,
+                /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
     sleCheck->setAccountID(sfDestination, dstAccountId);
     sleCheck->setFieldU32(sfSequence, seq.value());
     sleCheck->setFieldAmount(sfSendMax, ctx_.tx[sfSendMax]);

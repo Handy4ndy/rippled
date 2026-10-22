@@ -80,6 +80,18 @@ LoanBrokerCoverWithdraw::preclaim(PreclaimContext const& ctx)
         JLOG(ctx.j.warn()) << "Trying to withdraw into a pseudo-account.";
         return tecPSEUDO_ACCOUNT;
     }
+
+    // Soft allow-mode: block uncontrolled self-path in preclaim.
+    // Directed withdraw dest policy is in doApply (needs ApplyView).
+    if (dstAcct == account)
+    {
+        if (auto const sleSrc = ctx.view.read(keylet::account(account)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, account, sleSrc, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
     auto const sleBroker = ctx.view.read(keylet::loanBroker(brokerID));
     if (!sleBroker)
     {
@@ -240,6 +252,18 @@ LoanBrokerCoverWithdraw::doApply()
     auto const brokerID = tx[sfLoanBrokerID];
     auto const requestedAmount = tx[sfAmount];
     auto const dstAcct = tx[~sfDestination].value_or(accountID_);
+
+    if (dstAcct != accountID_)
+    {
+        auto const sleSrc = view().read(keylet::account(accountID_));
+        if (auto err = verifyWithdrawAuth(view(), accountID_, dstAcct, sleSrc, j_, 0);
+            !isTesSuccess(err))
+            return err;
+        auto const sleDst = view().read(keylet::account(dstAcct));
+        if (auto err = verifyDepositPreauth(ctx_.tx, view(), accountID_, dstAcct, sleDst, j_);
+            !isTesSuccess(err))
+            return err;
+    }
 
     auto const broker = view().peek(keylet::loanBroker(brokerID));
     if (!broker)

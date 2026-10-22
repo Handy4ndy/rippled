@@ -100,3 +100,8 @@ target/
 
 # Rust build directory
 crates/target
+
+# Amendment proposal docs live outside this tree
+/testAmendment/
+/devnet/
+/standalone/

@@ -9,6 +9,7 @@
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/entries/CheckEntry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/RippleStateHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
@@ -318,6 +319,19 @@ CheckCash::doApply()
         JLOG(ctx_.journal.fatal()) << "Precheck did not verify source or destination's existence.";
         return tecFAILED_PROCESSING;
         // LCOV_EXCL_STOP
+    }
+
+    {
+        auto const sleSrc = psb.read(keylet::account(srcId));
+        auto const sleDst = psb.read(keylet::account(accountID_));
+        std::uint32_t const dtag = (*sleCheck)->at(~sfDestinationTag).valueOr(0);
+        if (auto err = verifyWithdrawAuth(psb, srcId, accountID_, sleSrc, j_, dtag);
+            !isTesSuccess(err))
+            return err;
+        if (auto err = checkDepositPreauth(
+                ctx_.tx, psb, srcId, accountID_, sleDst, j_, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
     }
 
     auto const sponsorCheckSle = getLedgerEntryReserveSponsor(psb, sleCheck->rawSle());

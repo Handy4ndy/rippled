@@ -110,6 +110,8 @@ transResults()
         MAKE_ERROR(tecNO_SPONSOR_PERMISSION,         "Sponsor has not authorized this transaction."),
         MAKE_ERROR(tecOUT_OF_GAS,                    "The WASM code ran out of gas during execution."),
         MAKE_ERROR(tecBYTECODE_REJECTED,             "The custom WASM code that was run rejected your transaction."),
+        MAKE_ERROR(tecDEPOSIT_NOAUTH,                "Destination has denied this sender (DepositNoauth)."),
+        MAKE_ERROR(tecWITHDRAW_NOAUTH,               "Source has denied this destination (WithdrawNoauth)."),
 
         MAKE_ERROR(tefALREADY,                     "The exact transaction was already in this ledger."),
         MAKE_ERROR(tefBAD_ADD_AUTH,                "Not authorized to add account."),
@@ -197,6 +199,7 @@ transResults()
         MAKE_ERROR(temINVALID_ACCOUNT_ID,        "Malformed: A field contains an invalid account ID."),
         MAKE_ERROR(temCANNOT_PREAUTH_SELF,       "Malformed: An account may not preauthorize itself."),
         MAKE_ERROR(temINVALID_COUNT,             "Malformed: Count field outside valid range."),
+        MAKE_ERROR(temCANNOT_NOAUTH_SELF,        "Malformed: An account may not add itself to its own deny list."),
         MAKE_ERROR(temSEQ_AND_TICKET,            "Transaction contains a TicketSequence and a non-zero Sequence."),
         MAKE_ERROR(temBAD_NFTOKEN_TRANSFER_FEE,  "Malformed: The NFToken transfer fee must be between 1 and 5000, inclusive."),
         MAKE_ERROR(temXCHAIN_EQUAL_DOOR_ACCOUNTS,       "Malformed: Bridge must have unique door accounts."),

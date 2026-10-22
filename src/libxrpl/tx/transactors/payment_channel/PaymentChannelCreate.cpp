@@ -6,6 +6,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/Feature.h>
@@ -113,6 +114,15 @@ PaymentChannelCreate::preclaim(PreclaimContext const& ctx)
         // currently active amendments.
         if (isPseudoAccount(sled))
             return tecNO_PERMISSION;
+
+        std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
+        if (auto err = checkWithdrawAuth(ctx.view, account, dst, sle, ctx.j, dtag);
+            !isTesSuccess(err))
+            return err;
+        if (auto err = checkDepositPreauth(
+                ctx.tx, ctx.view, account, dst, sled, ctx.j, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
     }
 
     return tesSUCCESS;
@@ -164,6 +174,13 @@ PaymentChannelCreate::doApply()
     }
 
     auto const dst = ctx_.tx[sfDestination];
+    {
+        auto const sled = ctx_.view().read(keylet::account(dst));
+        if (auto err = checkDepositPreauth(
+                ctx_.tx, ctx_.view(), account, dst, sled, j_, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
 
     // Create PayChan in ledger.
     //

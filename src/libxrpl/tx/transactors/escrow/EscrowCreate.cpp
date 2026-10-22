@@ -9,6 +9,7 @@
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/entries/EscrowEntry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
 #include <xrpl/ledger/helpers/EscrowHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
@@ -251,6 +252,18 @@ EscrowCreate::preclaim(PreclaimContext const& ctx)
     if (isPseudoAccount(sled))
         return tecNO_PERMISSION;
 
+    {
+        auto const sleSrc = ctx.view.read(keylet::account(account));
+        std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
+        if (auto err = checkWithdrawAuth(ctx.view, account, dest, sleSrc, ctx.j, dtag);
+            !isTesSuccess(err))
+            return err;
+        if (auto err = checkDepositPreauth(
+                ctx.tx, ctx.view, account, dest, sled, ctx.j, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
+
     if (!isXRP(amount))
     {
         if (!ctx.view.rules().enabled(featureTokenEscrow))
@@ -305,6 +318,21 @@ EscrowCreate::doApply()
     auto const sle = ctx_.view().peek(keylet::account(accountID_));
     if (!sle)
         return tefINTERNAL;  // LCOV_EXCL_LINE
+
+    {
+        AccountID const dest{ctx_.tx[sfDestination]};
+        auto const sleDst = ctx_.view().read(keylet::account(dest));
+        if (auto err = checkDepositPreauth(
+                ctx_.tx,
+                ctx_.view(),
+                accountID_,
+                dest,
+                sleDst,
+                j_,
+                /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
 
     // Check reserve and funds availability
     STAmount const amount{ctx_.tx[sfAmount]};

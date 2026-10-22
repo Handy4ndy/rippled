@@ -6,6 +6,7 @@
 #include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/NFTokenHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/Asset.h>
@@ -344,6 +345,20 @@ NFTokenAcceptOffer::pay(AccountID const& from, AccountID const& to, STAmount con
     // This should never happen, but it's easy and quick to check.
     if (amount < beast::kZero)
         return tecINTERNAL;  // LCOV_EXCL_LINE
+
+    {
+        auto const sleFrom = view().read(keylet::account(from));
+        if (auto err = verifyWithdrawAuth(view(), from, to, sleFrom, j_, 0);
+            !isTesSuccess(err))
+            return err;
+        auto const sleTo = view().read(keylet::account(to));
+        // Deny-only: NFT settlement did not honour classic DepositAuth before
+        // Payment Policy. Keep inbound deny lists without requiring allowlists.
+        if (auto err = checkDepositPreauth(
+                ctx_.tx, view(), from, to, sleTo, j_, /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
 
     auto const result = accountSend(view(), from, to, amount, j_);
 

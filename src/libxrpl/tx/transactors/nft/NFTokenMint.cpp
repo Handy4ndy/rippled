@@ -4,6 +4,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/NFTokenHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -200,6 +201,19 @@ NFTokenMint::preclaim(PreclaimContext const& ctx)
         // The Amount field says create an offer for the minted token.
         if (hasExpired(ctx.view, ctx.tx[~sfExpiration]))
             return tecEXPIRED;
+
+        // Open sell offer (no Destination): uncontrolled value exit, same as
+        // NFTokenCreateOffer without Destination.
+        if (!ctx.tx.isFieldPresent(sfDestination))
+        {
+            auto const account = ctx.tx[sfAccount];
+            if (auto const sleSrc = ctx.view.read(keylet::account(account)))
+            {
+                if (auto err = verifyUncontrolledValueExit(ctx.view, account, sleSrc, ctx.j);
+                    !isTesSuccess(err))
+                    return err;
+            }
+        }
 
         // Rely on the common code shared with NFTokenCreateOffer to
         // do the validation.  We pass tfSellNFToken as the transaction flags

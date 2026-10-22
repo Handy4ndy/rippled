@@ -170,6 +170,9 @@ enum LedgerEntryType : std::uint16_t {
         LSF_FLAG(lsfGlobalFreeze, 0x00400000)                   /* True, all assets frozen */                                      \
         LSF_FLAG(lsfDefaultRipple, 0x00800000)                  /* True, incoming trust lines allow rippling by default */         \
         LSF_FLAG(lsfDepositAuth, 0x01000000)                    /* True, all deposits require authorization */                     \
+        LSF_FLAG(lsfDepositNoauth, 0x02000000)                  /* True, enforce deposit-noauth blacklist */                       \
+        LSF_FLAG(lsfWithdrawAuth, 0x00000100)                   /* True, outgoing payments require pre-authorization */            \
+        LSF_FLAG(lsfWithdrawNoauth, 0x00000200)                 /* True, enforce withdraw-noauth blacklist */                      \
         LSF_FLAG(lsfDisallowIncomingNFTokenOffer, 0x04000000)   /* True, reject new incoming NFT offers */                         \
         LSF_FLAG(lsfDisallowIncomingCheck, 0x08000000)          /* True, reject new checks */                                      \
         LSF_FLAG(lsfDisallowIncomingPayChan, 0x10000000)        /* True, reject new paychans */                                    \

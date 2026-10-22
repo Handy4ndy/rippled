@@ -9,6 +9,7 @@
 #include <xrpl/ledger/Sandbox.h>
 #include <xrpl/ledger/helpers/AMMHelpers.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/AccountID.h>
@@ -1638,6 +1639,9 @@ template <class TIn, class TOut, class TDerived>
 bool
 BookStep<TIn, TOut, TDerived>::checkMPTDEX(ReadView const& view, AccountID const& owner) const
 {
+    if (accountBlocksUncontrolledExit(view, owner))
+        return false;
+
     // Offer-owner locks on book_.in and book_.out are handled by the
     // liquidity sources before an offer reaches this point. OfferStream
     // filters CLOB offers through the assetIn deep-freeze check and the

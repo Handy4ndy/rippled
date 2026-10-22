@@ -240,6 +240,9 @@ static constexpr int kLoanPaymentsPerFeeIncrement = 5;
 static constexpr int kLoanMaximumPaymentsPerTransaction = 100;
 }  // namespace lending
 
+/** Maximum providers in a DepositSetauth / WithdrawSetauth list. */
+std::size_t constexpr maxAuthProvidersArraySize = 8;
+
 /**
  * The maximum length of a URI inside an NFT
  */

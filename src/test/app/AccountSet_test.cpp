@@ -158,6 +158,9 @@ public:
             asfDisableMaster,
             asfDefaultRipple,
             asfDepositAuth,
+            asfDepositNoauth,
+            asfWithdrawAuth,
+            asfWithdrawNoauth,
         });
     }
 

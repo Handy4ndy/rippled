@@ -238,6 +238,16 @@ LEDGER_ENTRY_DUPLICATE(ltDEPOSIT_PREAUTH, 0x0070, DepositPreauth, deposit_preaut
     {sfAuthorizeCredentials, SoeOptional},
 }))
 
+/** Inbound deny (blacklist) entry owned by the destination account. */
+LEDGER_ENTRY_DUPLICATE(ltDEPOSIT_NOAUTH, 0x0076, DepositNoauth, deposit_noauth, ({
+    {sfAccount,              SoeRequired},
+    {sfUnauthorize,          SoeRequired},
+    {sfExpiration,           SoeOptional},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
 /** A ledger object which describes a bidirectional trust line.
 
     @note Per Vinnie Falco this should be renamed to ltTRUST_LINE
@@ -593,6 +603,62 @@ LEDGER_ENTRY(ltLOAN, 0x0089, Loan, loan, ({
     // number of digits after the decimal point (excluding
     // trailing zeros).
     {sfLoanScale,                SoeDefault},
+}))
+
+/** Trustee inherited-blacklist provider subscription. */
+LEDGER_ENTRY(ltDEPOSIT_SET_NOAUTH, 0x008A, DepositSetNoauth, deposit_set_noauth, ({
+    {sfAccount,              SoeRequired},
+    {sfProviders,            SoeRequired},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
+/** Trustee inherited-whitelist provider subscription. */
+LEDGER_ENTRY(ltDEPOSIT_SET_PREAUTH, 0x008B, DepositSetPreauth, deposit_set_preauth, ({
+    {sfAccount,              SoeRequired},
+    {sfProviders,            SoeRequired},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
+/** Outgoing-payment whitelist entry owned by the source account. */
+LEDGER_ENTRY_DUPLICATE(ltWITHDRAW_PREAUTH, 0x008C, WithdrawPreauth, withdraw_preauth, ({
+    {sfAccount,              SoeRequired},
+    {sfAuthorize,            SoeRequired},
+    {sfDestinationTag,       SoeOptional},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
+/** Outgoing-payment blacklist entry owned by the source account. */
+LEDGER_ENTRY_DUPLICATE(ltWITHDRAW_NOAUTH, 0x008D, WithdrawNoauth, withdraw_noauth, ({
+    {sfAccount,              SoeRequired},
+    {sfUnauthorize,          SoeRequired},
+    {sfExpiration,           SoeOptional},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
+/** Outbound provider deny-list subscription. */
+LEDGER_ENTRY(ltWITHDRAW_SET_NOAUTH, 0x008E, WithdrawSetNoauth, withdraw_set_noauth, ({
+    {sfAccount,              SoeRequired},
+    {sfProviders,            SoeRequired},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
+/** Outbound provider allow-list subscription. */
+LEDGER_ENTRY(ltWITHDRAW_SET_PREAUTH, 0x008F, WithdrawSetPreauth, withdraw_set_preauth, ({
+    {sfAccount,              SoeRequired},
+    {sfProviders,            SoeRequired},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
 }))
 
 /** A ledger object representing a sponsorship.

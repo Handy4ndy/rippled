@@ -621,6 +621,15 @@ Payment::doApply()
         //  1. If Account == Destination, or
         //  2. If Account is deposit preauthorized by destination.
 
+        {
+            auto const sleSrcRipple = ctx_.view().read(keylet::account(accountID_));
+            std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
+            if (auto err = verifyWithdrawAuth(
+                    ctx_.view(), accountID_, dstAccountID, sleSrcRipple, ctx_.journal, dtag);
+                !isTesSuccess(err))
+                return err;
+        }
+
         if (auto err = verifyDepositPreauth(
                 ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
             !isTesSuccess(err))
@@ -690,6 +699,15 @@ Payment::doApply()
         if (auto const ter = canTransfer(view(), mptIssue, accountID_, dstAccountID);
             !isTesSuccess(ter))
             return ter;
+
+        {
+            auto const sleSrcMpt = ctx_.view().read(keylet::account(accountID_));
+            std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
+            if (auto err = verifyWithdrawAuth(
+                    ctx_.view(), accountID_, dstAccountID, sleSrcMpt, ctx_.journal, dtag);
+                !isTesSuccess(err))
+                return err;
+        }
 
         if (auto err = verifyDepositPreauth(
                 ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
@@ -851,13 +869,35 @@ Payment::doApply()
     // Get the base reserve.
     XRPAmount const dstReserve{view().fees().reserve};
 
-    if (dstAmount > dstReserve || sleDst->getFieldAmount(sfBalance) > dstReserve)
     {
-        if (auto err = verifyDepositPreauth(
-                ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
+        auto const sleSrcXrp = ctx_.view().read(keylet::account(accountID_));
+        std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
+        if (auto err = verifyWithdrawAuth(
+                ctx_.view(), accountID_, dstAccountID, sleSrcXrp, ctx_.journal, dtag);
             !isTesSuccess(err))
             return err;
     }
+
+    bool const unwedgeEligible =
+        dstAmount <= dstReserve && sleDst->getFieldAmount(sfBalance) <= dstReserve;
+
+    if (unwedgeEligible)
+    {
+        if (auto err = checkDepositPreauth(
+                ctx_.tx,
+                ctx_.view(),
+                accountID_,
+                dstAccountID,
+                sleDst,
+                ctx_.journal,
+                /*skipAllowForUnwedge=*/true);
+            !isTesSuccess(err))
+            return err;
+    }
+    else if (auto err = verifyDepositPreauth(
+                 ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
+             !isTesSuccess(err))
+        return err;
 
     // Do the arithmetic for the transfer and make the ledger change.
     sleSrc->setFieldAmount(sfBalance, sleSrc->getFieldAmount(sfBalance) - dstAmount);

@@ -3,6 +3,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/beast/utility/Zero.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/LendingHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/ledger/helpers/VaultHelpers.h>
@@ -52,6 +53,13 @@ LoanBrokerCoverDeposit::preclaim(PreclaimContext const& ctx)
     auto const account = tx[sfAccount];
     auto const brokerID = tx[sfLoanBrokerID];
     auto const amount = tx[sfAmount];
+
+    if (auto const sle = ctx.view.read(keylet::account(account)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, account, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     auto const sleBroker = ctx.view.read(keylet::loanBroker(brokerID));
     if (!sleBroker)

@@ -107,6 +107,7 @@ enum TEMcodes : TERUnderlyingType {
     temINVALID_ACCOUNT_ID,
     temCANNOT_PREAUTH_SELF,
     temINVALID_COUNT,
+    temCANNOT_NOAUTH_SELF,
 
     temUNCERTAIN,  // An internal intermediate result; should never be returned.
     temUNKNOWN,    // An internal intermediate result; should never be returned.
@@ -380,6 +381,8 @@ enum TECcodes : TERUnderlyingType {
     tecNO_SPONSOR_PERMISSION = 200,
     tecOUT_OF_GAS = 201,
     tecBYTECODE_REJECTED = 202,
+    tecDEPOSIT_NOAUTH = 203,
+    tecWITHDRAW_NOAUTH = 204,
 };
 
 //------------------------------------------------------------------------------

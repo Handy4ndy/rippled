@@ -6,6 +6,7 @@
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/ledger/ReadView.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/ledger/helpers/VaultHelpers.h>
@@ -88,6 +89,16 @@ VaultDeposit::preclaim(PreclaimContext const& ctx)
     auto const vault = ctx.view.read(keylet::vault(ctx.tx[sfVaultID]));
     if (!vault)
         return tecNO_ENTRY;
+
+    {
+        auto const account = ctx.tx[sfAccount];
+        if (auto const sle = ctx.view.read(keylet::account(account)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, account, sle, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
 
     if (ctx.view.rules().enabled(featureLendingProtocolV1_1))
     {

@@ -5,6 +5,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/ledger/ReadView.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/ConfidentialTransfer.h>
 #include <xrpl/protocol/Indexes.h>
@@ -40,6 +41,14 @@ ConfidentialMPTMergeInbox::calculateBaseFee(ReadView const& view, STTx const& tx
 TER
 ConfidentialMPTMergeInbox::preclaim(PreclaimContext const& ctx)
 {
+    auto const account = ctx.tx[sfAccount];
+    if (auto const sle = ctx.view.read(keylet::account(account)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, account, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
+
     auto const sleIssuance = ctx.view.read(keylet::mptokenIssuance(ctx.tx[sfMPTokenIssuanceID]));
     if (!sleIssuance)
         return tecOBJECT_NOT_FOUND;
@@ -72,7 +81,6 @@ ConfidentialMPTMergeInbox::preclaim(PreclaimContext const& ctx)
     }
 
     // Check lock
-    auto const account = ctx.tx[sfAccount];
     MPTIssue const mptIssue(ctx.tx[sfMPTokenIssuanceID]);
     if (auto const ter = checkFrozen(ctx.view, account, mptIssue); !isTesSuccess(ter))
         return ter;

@@ -10,6 +10,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/PermissionedDEXHelpers.h>
 #include <xrpl/ledger/helpers/RippleStateHelpers.h>
@@ -257,6 +258,15 @@ TOfferStreamBase<TIn, TOut>::step()
         if (isDeepFrozen(view_, offer_.owner(), offer_.assetIn()))
         {
             JLOG(j_.trace()) << "Removing deep frozen unfunded offer " << entry->key();
+            permRmOffer(entry->key());
+            offer_ = TOffer<TIn, TOut>{};
+            continue;
+        }
+
+        if (accountBlocksUncontrolledExit(view_, offer_.owner()))
+        {
+            JLOG(j_.trace()) << "Removing offer blocked by outbound payment policy "
+                             << entry->key();
             permRmOffer(entry->key());
             offer_ = TOffer<TIn, TOut>{};
             continue;

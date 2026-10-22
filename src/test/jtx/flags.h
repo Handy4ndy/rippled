@@ -51,6 +51,15 @@ private:
             case asfDepositAuth:
                 mask_ |= lsfDepositAuth;
                 break;
+            case asfDepositNoauth:
+                mask_ |= lsfDepositNoauth;
+                break;
+            case asfWithdrawAuth:
+                mask_ |= lsfWithdrawAuth;
+                break;
+            case asfWithdrawNoauth:
+                mask_ |= lsfWithdrawNoauth;
+                break;
             case asfAllowTrustLineClawback:
                 mask_ |= lsfAllowTrustLineClawback;
                 break;

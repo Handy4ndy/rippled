@@ -238,12 +238,22 @@ inline constexpr FlagValue tfUniversalMask = ~tfUniversal;
         TF_FLAG(tfSponsorshipEnd, 0x00010000)                                                                                                                  \
         TF_FLAG(tfSponsorshipCreate, 0x00020000)                                                                                                               \
         TF_FLAG(tfSponsorshipReassign, 0x00040000),                                                                                                            \
-        MASK_ADJ(0))                                                                                                                                          \
+        MASK_ADJ(0))                                                                                                                                           \
                                                                                                                                                                \
     TRANSACTION(ConfidentialMPTHolderKeyUpdate,                                                                                                                \
         TF_FLAG(tfHolderKeyRotation, 0x00010000)                                                                                                               \
         TF_FLAG(tfHolderKeyRecovery, 0x00020000)                                                                                                               \
         TF_FLAG(tfCancelRecovery, 0x00040000),                                                                                                                 \
+        MASK_ADJ(0))                                                                                                                                           \
+                                                                                                                                                               \
+    TRANSACTION(DepositSetauth,                                                                                                                                \
+        TF_FLAG(tfSetNoauthList, 0x00010000)                                                                                                                   \
+        TF_FLAG(tfSetPreauthList, 0x00020000),                                                                                                                 \
+        MASK_ADJ(0))                                                                                                                                           \
+                                                                                                                                                               \
+    TRANSACTION(WithdrawSetauth,                                                                                                                               \
+        TF_FLAG2(tfSetNoauthList, 0x00010000)                                                                                                                  \
+        TF_FLAG2(tfSetPreauthList, 0x00020000),                                                                                                                \
         MASK_ADJ(0))
 
 // clang-format on
@@ -439,7 +449,10 @@ inline constexpr FlagValue tfDepositSubTx =
     ASF_FLAG(asfDisallowIncomingPayChan, 14)      \
     ASF_FLAG(asfDisallowIncomingTrustline, 15)    \
     ASF_FLAG(asfAllowTrustLineClawback, 16)       \
-    ASF_FLAG(asfAllowTrustLineLocking, 17)
+    ASF_FLAG(asfAllowTrustLineLocking, 17)       \
+    ASF_FLAG(asfDepositNoauth, 18)                \
+    ASF_FLAG(asfWithdrawAuth, 19)                 \
+    ASF_FLAG(asfWithdrawNoauth, 20)
 
 #define ACCOUNTSET_FLAG_TO_VALUE(name, value) inline constexpr FlagValue name = value;
 #define ACCOUNTSET_FLAG_TO_MAP(name, value) {#name, value},

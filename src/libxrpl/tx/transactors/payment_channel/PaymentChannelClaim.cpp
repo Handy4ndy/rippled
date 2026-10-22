@@ -163,8 +163,18 @@ PaymentChannelClaim::doApply()
         if (!sled)
             return tecNO_DST;
 
-        if (auto err =
-                verifyDepositPreauth(ctx_.tx, ctx_.view(), txAccount, dst, sled, ctx_.journal);
+        // Locked funds belong to the channel owner (src), not the claim submitter.
+        // Match the channel DestinationTag (0 if absent) for WithdrawPreauth.
+        {
+            auto const sleSrc = ctx_.view().read(keylet::account(src));
+            std::uint32_t const dtag = (*slep)[~sfDestinationTag].valueOr(0);
+            if (auto err =
+                    verifyWithdrawAuth(ctx_.view(), src, dst, sleSrc, ctx_.journal, dtag);
+                !isTesSuccess(err))
+                return err;
+        }
+
+        if (auto err = verifyDepositPreauth(ctx_.tx, ctx_.view(), src, dst, sled, ctx_.journal);
             !isTesSuccess(err))
             return err;
 

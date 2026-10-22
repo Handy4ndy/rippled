@@ -333,6 +333,139 @@ parseDepositPreauth(
     return keylet::depositPreauth(*owner, sorted).key;
 }
 
+static std::expected<uint256, json::Value>
+parseDepositNoauth(
+    json::Value const& dn,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!dn.isObject())
+        return parseObjectID(dn, fieldName);
+
+    auto const owner = ledger_entry_helpers::requiredAccountID(dn, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+
+    auto const denied =
+        ledger_entry_helpers::requiredAccountID(dn, jss::unauthorized, "malformedUnauthorized");
+    if (!denied)
+        return std::unexpected(denied.error());
+
+    return keylet::depositNoauth(*owner, *denied).key;
+}
+
+static std::expected<uint256, json::Value>
+parseDepositSetNoauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+    return keylet::depositSetNoauth(*owner).key;
+}
+
+static std::expected<uint256, json::Value>
+parseDepositSetPreauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+    return keylet::depositSetPreauth(*owner).key;
+}
+
+static std::expected<uint256, json::Value>
+parseWithdrawPreauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+
+    auto const authorized =
+        ledger_entry_helpers::requiredAccountID(params, jss::authorize, "malformedAuthorized");
+    if (!authorized)
+        return std::unexpected(authorized.error());
+
+    std::uint32_t destTag = 0;
+    if (params.isMember(jss::destination_tag))
+    {
+        if (!params[jss::destination_tag].isIntegral())
+            return std::unexpected(rpc::makeParamError("malformedDestinationTag"));
+        destTag = params[jss::destination_tag].asUInt();
+    }
+
+    return keylet::withdrawPreauth(*owner, *authorized, destTag).key;
+}
+
+static std::expected<uint256, json::Value>
+parseWithdrawNoauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+
+    auto const denied =
+        ledger_entry_helpers::requiredAccountID(params, jss::unauthorized, "malformedUnauthorized");
+    if (!denied)
+        return std::unexpected(denied.error());
+
+    return keylet::withdrawNoauth(*owner, *denied).key;
+}
+
+static std::expected<uint256, json::Value>
+parseWithdrawSetNoauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+    return keylet::withdrawSetNoauth(*owner).key;
+}
+
+static std::expected<uint256, json::Value>
+parseWithdrawSetPreauth(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+    return keylet::withdrawSetPreauth(*owner).key;
+}
+
 static std::expected<UInt256, json::Value>
 parseDID(
     json::Value const& params,

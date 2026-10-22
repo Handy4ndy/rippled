@@ -8,6 +8,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
@@ -163,6 +164,17 @@ SponsorshipSet::preclaim(PreclaimContext const& ctx)
 
     if (sponseeID == sponsorID)
         return tecINTERNAL;  // LCOV_EXCL_LINE
+
+    // Creating or growing sponsorship commits sponsor reserve capacity.
+    if (!ctx.tx.isFlag(tfDeleteObject))
+    {
+        if (auto const sle = ctx.view.read(keylet::account(sponsorID)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, sponsorID, sle, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
 
     auto const sponsorAccSle = ctx.view.read(keylet::account(sponsorID));
     if (!sponsorAccSle)

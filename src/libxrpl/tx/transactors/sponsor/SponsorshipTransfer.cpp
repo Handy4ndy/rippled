@@ -8,6 +8,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
@@ -229,6 +230,18 @@ SponsorshipTransfer::preclaim(PreclaimContext const& ctx)
     if (!newSponsorSleExpected)
         return newSponsorSleExpected.error();  // LCOV_EXCL_LINE
     auto const newSponsorSle = *newSponsorSleExpected;
+
+    // New sponsor commits reserve capacity when present.
+    if (newSponsorSle)
+    {
+        if (auto const sponsorID = getTxReserveSponsorID(ctx.tx))
+        {
+            if (auto err =
+                    verifyUncontrolledValueExit(ctx.view, *sponsorID, newSponsorSle, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
 
     auto const account = ctx.tx[sfAccount];
     auto const sponseeID = ctx.tx[~sfSponsee].value_or(account);

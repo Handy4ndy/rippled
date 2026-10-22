@@ -7,6 +7,7 @@
 #include <xrpl/ledger/View.h>
 #include <xrpl/ledger/helpers/AMMHelpers.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/MPTokenHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/AMMCore.h>
@@ -95,6 +96,13 @@ AMMCreate::preclaim(PreclaimContext const& ctx)
     auto const accountID = ctx.tx[sfAccount];
     auto const amount = ctx.tx[sfAmount];
     auto const amount2 = ctx.tx[sfAmount2];
+
+    if (auto const sle = ctx.view.read(keylet::account(accountID)))
+    {
+        if (auto err = verifyUncontrolledValueExit(ctx.view, accountID, sle, ctx.j);
+            !isTesSuccess(err))
+            return err;
+    }
 
     // Check if AMM already exists for the token pair
     if (auto const ammKeylet = keylet::amm(amount.asset(), amount2.asset());

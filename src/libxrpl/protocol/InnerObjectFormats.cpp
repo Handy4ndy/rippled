@@ -120,6 +120,12 @@ InnerObjectFormats::InnerObjectFormats()
             {sfTxnSignature, SoeOptional},
             {sfSigners, SoeOptional},
         });
+
+    add(sfDepositProvider.jsonName,
+        sfDepositProvider.getCode(),
+        {
+            {sfAccount, SoeRequired},
+        });
 }
 
 InnerObjectFormats const&

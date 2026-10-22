@@ -187,6 +187,10 @@ OfferCreate::preclaim(PreclaimContext const& ctx)
     if (!sleCreator)
         return terNO_ACCOUNT;
 
+    if (auto err = verifyUncontrolledValueExit(ctx.view, id, sleCreator, ctx.j);
+        !isTesSuccess(err))
+        return err;
+
     std::uint32_t const uAccountSequence = sleCreator->getFieldU32(sfSequence);
 
     auto const viewJ = ctx.registry.get().getJournal("View");
