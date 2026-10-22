@@ -1501,7 +1501,8 @@ NetworkOPsImp::preProcessTransaction(std::shared_ptr<Transaction>& transaction)
         // enabled on this node. Remove together with the amendment.
         if (viewRules.enabled(fixCleanup3_4_0) ||
             (!sttx.isFieldPresent(sfSponsorSignature) &&
-             !sttx.isFieldPresent(sfCounterpartySignature)))
+             !sttx.isFieldPresent(sfCounterpartySignature) &&
+             !sttx.isFieldPresent(sfCounterpartySignatures)))
         {
             registry_.get().getHashRouter().setFlags(transaction->getID(), HashRouterFlags::BAD);
         }

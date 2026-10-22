@@ -10,6 +10,7 @@
 #include <xrpl/ledger/entries/DepositPreauthEntry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
@@ -555,6 +556,7 @@ withdrawNoauthLive(ReadView const& view, Keylet const& noauthKey)
 TER
 checkWithdrawAuth(
     ReadView const& view,
+    STTx const& tx,
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleSrc,
@@ -574,15 +576,17 @@ checkWithdrawAuth(
 
     if (denyMode)
     {
+        // Firewall deny uses tecFIREWALL_BLOCK; soft WithdrawNoauth stays as-is.
+        auto const denyTer = hardFw ? TER{tecFIREWALL_BLOCK} : TER{tecWITHDRAW_NOAUTH};
         if (withdrawNoauthLive(view, keylet::withdrawNoauth(src, dst)))
-            return tecWITHDRAW_NOAUTH;
+            return denyTer;
         if (auto const sleSet = view.read(keylet::withdrawSetNoauth(src)))
         {
             for (auto const& entry : sleSet->getFieldArray(sfProviders))
             {
                 AccountID const provider = entry.getAccountID(sfAccount);
                 if (withdrawNoauthLive(view, keylet::withdrawNoauth(provider, dst)))
-                    return tecWITHDRAW_NOAUTH;
+                    return denyTer;
             }
         }
     }
@@ -602,8 +606,14 @@ checkWithdrawAuth(
         }
         if (!hardFw)
             return tecNO_PERMISSION;
-        // Hard Firewall: checkFirewall already required CP for non-preauth dest.
-        return tesSUCCESS;
+        // Missing allow under Firewall: require cosign for src's own Firewall.
+        auto const sleFw = view.read(keylet::firewall(src));
+        if (!sleFw)
+            return tecREQUIRES_COUNTERPARTY;
+        if (isTesSuccess(
+                verifyCounterpartyCosign(view, tx, sleFw->getAccountID(sfCounterparty), j)))
+            return tesSUCCESS;
+        return tecREQUIRES_COUNTERPARTY;
     }
 
     return tesSUCCESS;
@@ -612,6 +622,7 @@ checkWithdrawAuth(
 TER
 verifyWithdrawAuth(
     ApplyView& view,
+    STTx const& tx,
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleSrc,
@@ -643,7 +654,7 @@ verifyWithdrawAuth(
         }
     }
 
-    return checkWithdrawAuth(view, src, dst, sleSrc, j, destinationTag);
+    return checkWithdrawAuth(view, tx, src, dst, sleSrc, j, destinationTag);
 }
 
 TER

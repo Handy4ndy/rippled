@@ -71,6 +71,18 @@ validSignerArrays(STObject const& proposedTx)
             return false;
     }
 
+    if (proposedTx.isFieldPresent(sfCounterpartySignatures))
+    {
+        for (auto const& entry : proposedTx.getFieldArray(sfCounterpartySignatures))
+        {
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (!validNestedSigners(sigObj))
+                return false;
+        }
+    }
+
     if (!proposedTx.isFieldPresent(sfBatchSigners))
         return true;
 

@@ -421,6 +421,7 @@ UNTYPED_SFIELD(sfCounterpartySignature,  OBJECT,    37, SField::kSmdDefault, SFi
 UNTYPED_SFIELD(sfSponsorSignature,       OBJECT,    38, SField::kSmdDefault, SField::kNotSigning)
 UNTYPED_SFIELD(sfProposedTransaction,    OBJECT,    39)
 UNTYPED_SFIELD(sfDepositProvider,        OBJECT,    40)
+UNTYPED_SFIELD(sfCounterpartySig,        OBJECT,    41, SField::kSmdDefault, SField::kNotSigning)
 
 // array of objects (common)
 // ARRAY/1 is reserved for end of array
@@ -451,3 +452,4 @@ UNTYPED_SFIELD(sfPermissions,            ARRAY,     29)
 UNTYPED_SFIELD(sfRawTransactions,        ARRAY,     30)
 UNTYPED_SFIELD(sfBatchSigners,           ARRAY,     31, SField::kSmdDefault, SField::kNotSigning)
 UNTYPED_SFIELD(sfProviders,              ARRAY,     32)
+UNTYPED_SFIELD(sfCounterpartySignatures, ARRAY,     33, SField::kSmdDefault, SField::kNotSigning)

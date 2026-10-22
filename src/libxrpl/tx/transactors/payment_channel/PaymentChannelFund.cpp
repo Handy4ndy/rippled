@@ -115,7 +115,7 @@ PaymentChannelFund::doApply()
     // Soft outbound policy to the channel destination when adding funds.
     {
         std::uint32_t const dtag = slep->at(~sfDestinationTag).valueOr(0);
-        if (auto err = verifyWithdrawAuth(ctx_.view(), txAccount, dst, sle, j_, dtag);
+        if (auto err = verifyWithdrawAuth(ctx_.view(), ctx_.tx, txAccount, dst, sle, j_, dtag);
             !isTesSuccess(err))
             return err;
         auto const sleDst = ctx_.view().read(keylet::account(dst));

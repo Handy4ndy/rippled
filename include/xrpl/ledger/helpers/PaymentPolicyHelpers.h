@@ -47,6 +47,10 @@ hasFirewall(ReadView const& view, AccountID const& owner);
 AccountID
 firewallValueSubject(STTx const& tx, ReadView const& view);
 
+// temMALFORMED if both single and array present, array empty, or size > max.
+NotTEC
+preflightCounterpartySignatures(STTx const& tx, beast::Journal j);
+
 TER
 verifyCounterpartyCosign(
     ReadView const& view,
@@ -69,6 +73,12 @@ accountSetTouchesKeySeal(STTx const& tx);
 
 TER
 checkFirewall(ReadView const& view, STTx const& tx, beast::Journal j);
+
+// Extra Firewall/soft seals when the payer is not the primary subject:
+// reserve sponsors, SponsorshipSet CounterpartySponsor, and NFT
+// buy/brokered buyers (deny / WithdrawPreauth of payee / else CP).
+TER
+checkAdditionalValueSubjects(ReadView const& view, STTx const& tx, beast::Journal j);
 
 XRPAmount
 firewallNativeTransfer(STTx const& tx);

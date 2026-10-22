@@ -26,7 +26,8 @@ enum class SignatureRole {
      */
     Transaction,
     /**
-     * The counterparty's signature, in sfCounterpartySignature.
+     * The counterparty's signature, in sfCounterpartySignature or in an
+     * sfCounterpartySig element of sfCounterpartySignatures.
      */
     Counterparty,
     /**

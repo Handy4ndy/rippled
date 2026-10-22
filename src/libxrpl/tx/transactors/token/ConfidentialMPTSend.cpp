@@ -292,7 +292,8 @@ ConfidentialMPTSend::preclaim(PreclaimContext const& ctx)
     {
         auto const sleSrc = ctx.view.read(keylet::account(account));
         std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
-        if (auto const err = checkWithdrawAuth(ctx.view, account, destination, sleSrc, ctx.j, dtag);
+        if (auto const err =
+                checkWithdrawAuth(ctx.view, ctx.tx, account, destination, sleSrc, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
     }
@@ -333,7 +334,7 @@ ConfidentialMPTSend::doApply()
     {
         std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
         if (auto const err =
-                verifyWithdrawAuth(view(), accountID_, destination, sleSrcAcct, j_, dtag);
+                verifyWithdrawAuth(view(), ctx_.tx, accountID_, destination, sleSrcAcct, j_, dtag);
             !isTesSuccess(err))
             return err;
         if (auto const err =
@@ -341,11 +342,6 @@ ConfidentialMPTSend::doApply()
             !isTesSuccess(err))
             return err;
     }
-
-    // Deposit preauth authorization was already verified in preclaim.
-    // Remove any expired credentials.
-    if (auto err = cleanupExpiredCredentials(ctx_.tx, view(), j_); !isTesSuccess(err))
-        return err;
 
     auto const senderEc = ctx_.tx[sfSenderEncryptedAmount];
     auto const destEc = ctx_.tx[sfDestinationEncryptedAmount];

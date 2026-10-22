@@ -489,6 +489,11 @@ constexpr std::size_t kMaxBatchTxCount = 8;
 constexpr std::size_t kMaxBatchSigners = kMaxBatchTxCount * 3;
 
 /**
+ * Max elements in sfCounterpartySignatures (primary + sponsor + NFT buyer).
+ */
+constexpr std::size_t kMaxCounterpartySignatures = 3;
+
+/**
  * Length of a secp256k1 scalar in bytes.
  */
 constexpr std::size_t kEcScalarLength = kMPT_SCALAR_SIZE;

@@ -7,7 +7,9 @@
 
 #include <xrpl/protocol/SField.h>
 
+#include <initializer_list>
 #include <optional>
+#include <vector>
 
 namespace xrpl::test::jtx {
 
@@ -57,6 +59,29 @@ public:
     }
 
     explicit Sig(Account const& account) : Sig(kTopLevel, account)
+    {
+    }
+
+    void
+    operator()(Env&, JTx& jt) const;
+};
+
+/**
+ * Attach sfCounterpartySignatures (array of CounterpartySig) and sign each
+ * entry with the given accounts. Mutually exclusive with a single
+ * sfCounterpartySignature on the same JTx.
+ */
+class CpSigs
+{
+private:
+    std::vector<Account> accounts_;
+
+public:
+    explicit CpSigs(std::initializer_list<Account> accounts) : accounts_(accounts)
+    {
+    }
+
+    explicit CpSigs(std::vector<Account> accounts) : accounts_(std::move(accounts))
     {
     }
 

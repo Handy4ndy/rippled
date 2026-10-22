@@ -256,7 +256,8 @@ LoanBrokerCoverWithdraw::doApply()
     if (dstAcct != accountID_)
     {
         auto const sleSrc = view().read(keylet::account(accountID_));
-        if (auto err = verifyWithdrawAuth(view(), accountID_, dstAcct, sleSrc, j_, 0);
+        std::uint32_t const dtag = tx[~sfDestinationTag].value_or(0);
+        if (auto err = verifyWithdrawAuth(view(), ctx_.tx, accountID_, dstAcct, sleSrc, j_, dtag);
             !isTesSuccess(err))
             return err;
         auto const sleDst = view().read(keylet::account(dstAcct));

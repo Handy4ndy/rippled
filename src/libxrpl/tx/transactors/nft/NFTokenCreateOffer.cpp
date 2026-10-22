@@ -89,16 +89,19 @@ TER
 NFTokenCreateOffer::doApply()
 {
     AccountID const account = ctx_.tx[sfAccount];
-    // Buy offers: creator pays. Sell offers: funds later flow destination -> creator,
-    // so do not apply creator->dest withdraw/deposit checks at create time.
-    if (!ctx_.tx.isFlag(tfSellNFToken))
+    // Directed create: WithdrawAuth gates seller/buyer -> Destination.
+    // Buy offers also deposit-check Destination (funds may settle that way).
+    // Directed sell: NFT leaves the seller to Destination on accept; soft W
+    // mirrors Firewall check-class dest preauth. Open sell uses U-exit in
+    // preclaim instead.
+    if (auto const dest = ctx_.tx[~sfDestination])
     {
-        if (auto const dest = ctx_.tx[~sfDestination])
+        auto const sleSrc = view().read(keylet::account(account));
+        if (auto err = verifyWithdrawAuth(view(), ctx_.tx, account, *dest, sleSrc, j_, 0);
+            !isTesSuccess(err))
+            return err;
+        if (!ctx_.tx.isFlag(tfSellNFToken))
         {
-            auto const sleSrc = view().read(keylet::account(account));
-            if (auto err = verifyWithdrawAuth(view(), account, *dest, sleSrc, j_, 0);
-                !isTesSuccess(err))
-                return err;
             auto const sleDst = view().read(keylet::account(*dest));
             if (auto err = verifyDepositPreauth(ctx_.tx, view(), account, *dest, sleDst, j_);
                 !isTesSuccess(err))

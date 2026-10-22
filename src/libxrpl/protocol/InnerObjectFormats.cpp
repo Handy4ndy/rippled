@@ -113,6 +113,15 @@ InnerObjectFormats::InnerObjectFormats()
             {sfSigners, SoeOptional},
         });
 
+    // Element of sfCounterpartySignatures; same shape as CounterpartySignature.
+    add(sfCounterpartySig.jsonName,
+        sfCounterpartySig.getCode(),
+        {
+            {sfSigningPubKey, SoeOptional},
+            {sfTxnSignature, SoeOptional},
+            {sfSigners, SoeOptional},
+        });
+
     add(sfSponsorSignature.jsonName,
         sfSponsorSignature.getCode(),
         {

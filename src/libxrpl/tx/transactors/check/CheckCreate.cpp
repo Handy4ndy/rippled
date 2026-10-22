@@ -101,7 +101,7 @@ CheckCreate::preclaim(PreclaimContext const& ctx)
     {
         auto const sleSrc = ctx.view.read(keylet::account(srcId));
         std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
-        if (auto err = checkWithdrawAuth(ctx.view, srcId, dstId, sleSrc, ctx.j, dtag);
+        if (auto err = checkWithdrawAuth(ctx.view, ctx.tx, srcId, dstId, sleSrc, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
         // Classic DepositAuth is enforced when the dest cashes. DepositNoauth

@@ -210,6 +210,12 @@ invokePreclaim(PreclaimContext const& ctx)
                 if (TER const result = checkFirewall(ctx.view, ctx.tx, ctx.j);
                     !isTesSuccess(result))
                     return result;
+
+                // Extra subjects: reserve sponsor, SponsorshipSet
+                // CounterpartySponsor, NFT buy/brokered buyer.
+                if (TER const result = checkAdditionalValueSubjects(ctx.view, ctx.tx, ctx.j);
+                    !isTesSuccess(result))
+                    return result;
             }
 
             return T::preclaim(ctx);

@@ -3132,7 +3132,8 @@ PeerImp::checkTransaction(
                 // the amendment.
                 if (validatedRules.enabled(fixCleanup3_4_0) ||
                     (!stx->isFieldPresent(sfSponsorSignature) &&
-                     !stx->isFieldPresent(sfCounterpartySignature)))
+                     !stx->isFieldPresent(sfCounterpartySignature) &&
+                     !stx->isFieldPresent(sfCounterpartySignatures)))
                 {
                     app_.getHashRouter().setFlags(stx->getTransactionID(), HashRouterFlags::BAD);
                 }

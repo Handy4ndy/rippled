@@ -169,7 +169,7 @@ PaymentChannelClaim::doApply()
             auto const sleSrc = ctx_.view().read(keylet::account(src));
             std::uint32_t const dtag = (*slep)[~sfDestinationTag].valueOr(0);
             if (auto err =
-                    verifyWithdrawAuth(ctx_.view(), src, dst, sleSrc, ctx_.journal, dtag);
+                    verifyWithdrawAuth(ctx_.view(), ctx_.tx, src, dst, sleSrc, ctx_.journal, dtag);
                 !isTesSuccess(err))
                 return err;
         }

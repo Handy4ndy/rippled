@@ -295,6 +295,9 @@ Transactor::preflight1(PreflightContext const& ctx, std::uint32_t flagMask)
     if (auto const ter = preflight1Sponsor(ctx); !isTesSuccess(ter))
         return ter;
 
+    if (auto const ter = preflightCounterpartySignatures(ctx.tx, ctx.j); !isTesSuccess(ter))
+        return ter;
+
     return tesSUCCESS;
 }
 
@@ -479,6 +482,20 @@ Transactor::calculateBaseFee(ReadView const& view, STTx const& tx)
         auto const cpObj = tx.getFieldObject(sfCounterpartySignature);
         if (cpObj.isFieldPresent(sfSigners))
             counterpartySignerCount += cpObj.getFieldArray(sfSigners).size();
+    }
+
+    // CounterpartySignatures: one base fee per element, plus nested Signers.
+    if (tx.isFieldPresent(sfCounterpartySignatures))
+    {
+        for (auto const& entry : tx.getFieldArray(sfCounterpartySignatures))
+        {
+            ++counterpartySignerCount;
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (sigObj.isFieldPresent(sfSigners))
+                counterpartySignerCount += sigObj.getFieldArray(sfSigners).size();
+        }
     }
 
     return baseFee + ((signerCount + sponsorSignerCount + counterpartySignerCount) * baseFee);

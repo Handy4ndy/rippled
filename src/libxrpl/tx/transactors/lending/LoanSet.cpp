@@ -43,6 +43,17 @@
 
 namespace xrpl {
 
+namespace {
+
+bool
+hasLendingCounterpartySig(STTx const& tx)
+{
+    return tx.isFieldPresent(sfCounterpartySignature) ||
+        tx.isFieldPresent(sfCounterpartySignatures);
+}
+
+}  // namespace
+
 // StartDate is strictly after SubscriptionDate. A min-gap vault must still
 // fit a minimum-interval loan plus kLoanRedemptionBuffer. The interval and
 // buffer constants are independent; only their sum (plus the +1 for a
@@ -84,25 +95,38 @@ LoanSet::preflight(PreflightContext const& ctx)
         return temBAD_SIGNER;
     }
 
-    // These extra hoops are because STObjects cannot be Proxy'd from STObject.
-    auto const counterPartySig = [&tx] -> std::optional<STObject const> {
-        if (tx.isFieldPresent(sfCounterpartySignature))
-            return tx.getFieldObject(sfCounterpartySignature);
-        return std::nullopt;
-    }();
-    // A proposed LoanSet is stored unsigned; its CounterpartySignature is
-    // collected on-ledger afterward, so its absence here is expected, not an
-    // error (On-Chain Cosigner spec §5.3.1.2).
-    if (!tx.isFlag(tfInnerBatchTxn) && !counterPartySig && (ctx.flags & TapProposal) == 0)
+    // TapProposal LoanSet is stored unsigned; cosign is collected later.
+    if (!tx.isFlag(tfInnerBatchTxn) && !hasLendingCounterpartySig(tx) &&
+        (ctx.flags & TapProposal) == 0)
     {
         JLOG(ctx.j.warn()) << "LoanSet transaction must have a CounterpartySignature.";
         return temBAD_SIGNER;
     }
 
-    if (counterPartySig)
-    {
-        if (auto const ret = xrpl::detail::preflightCheckSigningKey(*counterPartySig, ctx.j))
+    auto const checkLendingSigObject = [&](STObject const& sigObj) -> NotTEC {
+        if (auto const ret = xrpl::detail::preflightCheckSigningKey(sigObj, ctx.j))
             return ret;
+        if (auto const ret = xrpl::detail::preflightCheckSimulateKeys(ctx.flags, sigObj, ctx.j))
+            return *ret;
+        return tesSUCCESS;
+    };
+
+    if (tx.isFieldPresent(sfCounterpartySignature))
+    {
+        if (auto const ret = checkLendingSigObject(tx.getFieldObject(sfCounterpartySignature));
+            !isTesSuccess(ret))
+            return ret;
+    }
+    else if (tx.isFieldPresent(sfCounterpartySignatures))
+    {
+        for (auto const& entry : tx.getFieldArray(sfCounterpartySignatures))
+        {
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (auto const ret = checkLendingSigObject(sigObj); !isTesSuccess(ret))
+                return ret;
+        }
     }
 
     if (auto const data = tx[~sfData];
@@ -144,14 +168,6 @@ LoanSet::preflight(PreflightContext const& ctx)
         return temINVALID;
     }
 
-    // Copied from preflight2
-    if (counterPartySig)
-    {
-        if (auto const ret =
-                xrpl::detail::preflightCheckSimulateKeys(ctx.flags, *counterPartySig, ctx.j))
-            return *ret;
-    }
-
     if (auto const brokerID = ctx.tx[~sfLoanBrokerID]; brokerID && *brokerID == beast::kZero)
         return temINVALID;
 
@@ -178,12 +194,27 @@ LoanSet::checkSign(PreclaimContext const& ctx)
     if (!counterSigner)
         return temBAD_SIGNER;
 
-    // Counterparty signature is optional. Presence is checked in preflight.
-    if (!ctx.tx.isFieldPresent(sfCounterpartySignature))
-        return tesSUCCESS;
-    auto const counterSig = ctx.tx.getFieldObject(sfCounterpartySignature);
-    return Transactor::checkSign(
-        ctx.view, ctx.flags, ctx.parentBatchId, *counterSigner, counterSig, ctx.j);
+    if (ctx.tx.isFieldPresent(sfCounterpartySignature))
+    {
+        auto const counterSig = ctx.tx.getFieldObject(sfCounterpartySignature);
+        return Transactor::checkSign(
+            ctx.view, ctx.flags, ctx.parentBatchId, *counterSigner, counterSig, ctx.j);
+    }
+    if (ctx.tx.isFieldPresent(sfCounterpartySignatures))
+    {
+        for (auto const& entry : ctx.tx.getFieldArray(sfCounterpartySignatures))
+        {
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (isTesSuccess(
+                    Transactor::checkSign(
+                        ctx.view, ctx.flags, ctx.parentBatchId, *counterSigner, sigObj, ctx.j)))
+                return tesSUCCESS;
+        }
+        return tefBAD_AUTH;
+    }
+    return tesSUCCESS;
 }
 
 XRPAmount
@@ -191,26 +222,18 @@ LoanSet::calculateBaseFee(ReadView const& view, STTx const& tx)
 {
     auto const normalCost = Transactor::calculateBaseFee(view, tx);
 
-    // Compute the additional cost of each signature in the
-    // CounterpartySignature, whether a single signature or a multisignature
-    XRPAmount const baseFee = view.fees().base;
-
-    // Counterparty signature is optional, but getFieldObject will return an
-    // empty object if it's not present.
+    // Array fees come from Transactor. Singular single-key lending cosign
+    // adds one base fee; nested Signers are already counted there.
+    if (tx.isFieldPresent(sfCounterpartySignatures))
+        return normalCost;
+    if (!tx.isFieldPresent(sfCounterpartySignature))
+        return normalCost;
     auto const counterSig = tx.getFieldObject(sfCounterpartySignature);
-    // Each signer adds one more baseFee to the minimum required fee
-    // for the transaction. Note that unlike the base class, the single signer
-    // is counted if present. It will only be absent in a batch inner
-    // transaction.
-    std::size_t const signerCount = [&counterSig] -> int {
-        // Compute defensively.
-        // Assure that "tx" cannot be accessed and cause confusion or miscalculations.
-        if (counterSig.isFieldPresent(sfSigners))
-            return counterSig.getFieldArray(sfSigners).size();
-        return counterSig.isFieldPresent(sfTxnSignature) ? 1 : 0;
-    }();
-
-    return normalCost + (signerCount * baseFee);
+    if (counterSig.isFieldPresent(sfSigners))
+        return normalCost;
+    if (counterSig.isFieldPresent(sfTxnSignature))
+        return normalCost + view.fees().base;
+    return normalCost;
 }
 
 std::vector<OptionaledField<STNumber>> const&

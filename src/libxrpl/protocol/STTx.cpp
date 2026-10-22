@@ -279,6 +279,21 @@ STTx::checkSign(Rules const& rules) const
             return std::unexpected("Counterparty: " + ret.error());
     }
 
+    if (isFieldPresent(sfCounterpartySignatures))
+    {
+        auto const& arr = getFieldArray(sfCounterpartySignatures);
+        if (arr.empty() || arr.size() > kMaxCounterpartySignatures)
+            return std::unexpected("CounterpartySignatures array size invalid.");
+        for (auto const& entry : arr)
+        {
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (auto const ret = checkSign(rules, sigObj, SignatureRole::Counterparty); !ret)
+                return std::unexpected("Counterparty: " + ret.error());
+        }
+    }
+
     if (isFieldPresent(sfSponsorSignature))
     {
         auto const sponsorSignatureObj = getFieldObject(sfSponsorSignature);

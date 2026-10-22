@@ -236,8 +236,7 @@ SponsorshipTransfer::preclaim(PreclaimContext const& ctx)
     {
         if (auto const sponsorID = getTxReserveSponsorID(ctx.tx))
         {
-            if (auto err =
-                    verifyUncontrolledValueExit(ctx.view, *sponsorID, newSponsorSle, ctx.j);
+            if (auto err = verifyUncontrolledValueExit(ctx.view, *sponsorID, newSponsorSle, ctx.j);
                 !isTesSuccess(err))
                 return err;
         }

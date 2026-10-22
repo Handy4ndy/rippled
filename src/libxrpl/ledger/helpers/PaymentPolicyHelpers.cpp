@@ -6,6 +6,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/CredentialHelpers.h>
+#include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/Indexes.h>
@@ -22,8 +23,12 @@
 #include <xrpl/protocol/Sign.h>
 #include <xrpl/protocol/TxFlags.h>
 #include <xrpl/protocol/digest.h>
+#include <xrpl/protocol/nft.h>
 
+#include <algorithm>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace xrpl {
 
@@ -51,6 +56,7 @@ firewallActionFor(TxType tt)
 
         // Uncontrolled value exits: always CP while Firewall exists.
         // XChainBridge removed upstream (XRPLF #8255); no ttXCHAIN_* cases.
+        // NFTokenBurn destroys the holder's NFT with no preauth destination.
         case ttOFFER_CREATE:
         case ttAMM_CREATE:
         case ttAMM_DEPOSIT:
@@ -64,6 +70,7 @@ firewallActionFor(TxType tt)
         case ttCONFIDENTIAL_MPT_CONVERT_BACK:
         case ttSPONSORSHIP_SET:
         case ttSPONSORSHIP_TRANSFER:
+        case ttNFTOKEN_BURN:
             return FirewallAction::block;
 
         case ttACCOUNT_DELETE:
@@ -94,7 +101,6 @@ firewallActionFor(TxType tt)
         case ttDID_DELETE:
         case ttORACLE_SET:
         case ttORACLE_DELETE:
-        case ttNFTOKEN_BURN:
         case ttNFTOKEN_CANCEL_OFFER:
         case ttNFTOKEN_MODIFY:
         case ttOFFER_CANCEL:
@@ -199,6 +205,8 @@ extractFirewallDestination(STTx const& tx, ReadView const& view)
             break;
 
         case ttPAYCHAN_CLAIM:
+        case ttPAYCHAN_FUND:
+            // Fund has no sfDestination; dest/tag live on the channel SLE.
             if (tx.isFieldPresent(sfChannel))
             {
                 if (auto const sle = view.read(Keylet{ltPAYCHAN, tx.getFieldH256(sfChannel)}))
@@ -214,9 +222,43 @@ extractFirewallDestination(STTx const& tx, ReadView const& view)
 
         case ttCHECK_CASH:
             // Funds move from the check creator to the casher (tx Account).
-            info.destination = tx.getAccountID(sfAccount);
-            info.tag = 0;
-            info.hasDestination = true;
+            // Tag comes from the check SLE (same as soft verifyWithdrawAuth).
+            // Missing SLE: leave hasDestination false so checkFirewall requires CP.
+            if (tx.isFieldPresent(sfCheckID))
+            {
+                if (auto const sle = view.read(keylet::check(tx.getFieldH256(sfCheckID))))
+                {
+                    info.destination = tx.getAccountID(sfAccount);
+                    info.tag = sle->isFieldPresent(sfDestinationTag)
+                        ? sle->getFieldU32(sfDestinationTag)
+                        : 0;
+                    info.hasDestination = true;
+                }
+            }
+            break;
+
+        case ttNFTOKEN_ACCEPT_OFFER:
+            // Buy present: preauth peer is the buy-offer owner (buyer).
+            // Sell-only: preauth peer is the sell-offer owner (seller).
+            if (auto const buy = tx[~sfNFTokenBuyOffer])
+            {
+                if (auto const sle = view.read(keylet::nftokenOffer(*buy)))
+                {
+                    info.destination = sle->getAccountID(sfOwner);
+                    info.tag = 0;
+                    info.hasDestination = true;
+                    break;
+                }
+            }
+            if (auto const sell = tx[~sfNFTokenSellOffer])
+            {
+                if (auto const sle = view.read(keylet::nftokenOffer(*sell)))
+                {
+                    info.destination = sle->getAccountID(sfOwner);
+                    info.tag = 0;
+                    info.hasDestination = true;
+                }
+            }
             break;
 
         default:
@@ -263,16 +305,24 @@ firewallValueSubject(STTx const& tx, ReadView const& view)
             }
             break;
 
-        case ttNFTOKEN_ACCEPT_OFFER: {
-            // Buy offer present: funds leave the buy-offer owner.
-            // Sell-only accept: the submitter (buyer) pays.
-            if (auto const buy = tx[~sfNFTokenBuyOffer])
+        case ttNFTOKEN_ACCEPT_OFFER:
+            // Buy-only: NFT leaves the acceptor (seller).
+            // Brokered (buy+sell): NFT leaves the sell-offer owner; broker is
+            // not the value subject.
+            // Sell-only: fall through to sfAccount (buyer pays). Buy/brokered
+            // buyer is an additional Firewall subject (checkAdditional) and
+            // soft pay() WithdrawAuth only short-circuits when sealed.
+            if (tx[~sfNFTokenBuyOffer] && tx[~sfNFTokenSellOffer])
             {
-                if (auto const sle = view.read(keylet::nftokenOffer(*buy)))
+                if (auto const sle = view.read(keylet::nftokenOffer(*tx[~sfNFTokenSellOffer])))
                     return sle->getAccountID(sfOwner);
             }
+            else if (tx[~sfNFTokenBuyOffer])
+            {
+                if (tx.isFieldPresent(sfAccount))
+                    return tx.getAccountID(sfAccount);
+            }
             break;
-        }
 
         default:
             break;
@@ -284,23 +334,42 @@ firewallValueSubject(STTx const& tx, ReadView const& view)
     return beast::kZero;
 }
 
+NotTEC
+preflightCounterpartySignatures(STTx const& tx, beast::Journal j)
+{
+    bool const hasSingle = tx.isFieldPresent(sfCounterpartySignature);
+    bool const hasArray = tx.isFieldPresent(sfCounterpartySignatures);
+    if (hasSingle && hasArray)
+    {
+        JLOG(j.debug())
+            << "preflight: CounterpartySignature and CounterpartySignatures both present";
+        return temMALFORMED;
+    }
+    if (!hasArray)
+        return tesSUCCESS;
+
+    auto const& arr = tx.getFieldArray(sfCounterpartySignatures);
+    if (arr.empty() || arr.size() > kMaxCounterpartySignatures)
+    {
+        JLOG(j.debug()) << "preflight: CounterpartySignatures size invalid";
+        return temMALFORMED;
+    }
+    return tesSUCCESS;
+}
+
+namespace {
+
 TER
-verifyCounterpartyCosign(
+verifyCounterpartySigObject(
     ReadView const& view,
     STTx const& tx,
     AccountID const& counterparty,
+    STObject const& sigObj,
     beast::Journal j)
 {
-    if (!tx.isFieldPresent(sfCounterpartySignature))
-    {
-        JLOG(j.trace()) << "Firewall: missing CounterpartySignature";
-        return tecREQUIRES_COUNTERPARTY;
-    }
-
-    auto const& sigObj = tx.getFieldObject(sfCounterpartySignature);
     if (!sigObj.isFieldPresent(sfSigningPubKey) || !sigObj.isFieldPresent(sfTxnSignature))
     {
-        JLOG(j.trace()) << "Firewall: CounterpartySignature incomplete";
+        JLOG(j.trace()) << "Firewall: Counterparty sig incomplete";
         return tecREQUIRES_COUNTERPARTY;
     }
 
@@ -332,7 +401,7 @@ verifyCounterpartyCosign(
         tx.addWithoutSigningFields(data);
         if (!verify(pk, data.slice(), makeSlice(sigBlob)))
         {
-            JLOG(j.trace()) << "Firewall: CounterpartySignature crypto failed";
+            JLOG(j.trace()) << "Firewall: Counterparty sig crypto failed";
             return tecREQUIRES_COUNTERPARTY;
         }
     }
@@ -342,6 +411,40 @@ verifyCounterpartyCosign(
     }
 
     return tesSUCCESS;
+}
+
+}  // namespace
+
+TER
+verifyCounterpartyCosign(
+    ReadView const& view,
+    STTx const& tx,
+    AccountID const& counterparty,
+    beast::Journal j)
+{
+    if (tx.isFieldPresent(sfCounterpartySignatures))
+    {
+        for (auto const& entry : tx.getFieldArray(sfCounterpartySignatures))
+        {
+            // Array elements are wrapped CounterpartySig objects.
+            STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                ? entry.getFieldObject(sfCounterpartySig)
+                : entry;
+            if (isTesSuccess(verifyCounterpartySigObject(view, tx, counterparty, sigObj, j)))
+                return tesSUCCESS;
+        }
+        JLOG(j.trace()) << "Firewall: no CounterpartySignatures entry matched";
+        return tecREQUIRES_COUNTERPARTY;
+    }
+
+    if (!tx.isFieldPresent(sfCounterpartySignature))
+    {
+        JLOG(j.trace()) << "Firewall: missing CounterpartySignature";
+        return tecREQUIRES_COUNTERPARTY;
+    }
+
+    return verifyCounterpartySigObject(
+        view, tx, counterparty, tx.getFieldObject(sfCounterpartySignature), j);
 }
 
 TER
@@ -560,14 +663,27 @@ checkFirewall(ReadView const& view, STTx const& tx, beast::Journal j)
         return tecFIREWALL_ACTIVE;
     }
 
-    auto exceedsMaxFee = [&](std::shared_ptr<SLE const> const& sleCap) -> bool {
-        if (tt == ttFIREWALL_SET || tt == ttFIREWALL_DELETE)
-            return false;
+    auto feeExceedsCap = [&](std::shared_ptr<SLE const> const& sleCap) -> bool {
         if (!sleCap || !sleCap->isFieldPresent(sfMaxFee))
             return false;
         auto const maxFee = sleCap->getFieldAmount(sfMaxFee);
         auto const fee = tx.getFieldAmount(sfFee);
         return !fee.native() || !maxFee.native() || fee.xrp() > maxFee.xrp();
+    };
+
+    // Set/Delete may exceed MaxFee only after verifyCounterpartyCosign succeeds;
+    // otherwise enforce MaxFee (tef, not tec).
+    auto exceedsMaxFee = [&](std::shared_ptr<SLE const> const& sleCap) -> bool {
+        if (!feeExceedsCap(sleCap))
+            return false;
+        if (tt == ttFIREWALL_SET || tt == ttFIREWALL_DELETE)
+        {
+            if (sleCap &&
+                isTesSuccess(
+                    verifyCounterpartyCosign(view, tx, sleCap->getAccountID(sfCounterparty), j)))
+                return false;
+        }
+        return true;
     };
 
     // MaxFee binds whoever actually pays sfFee (delegate on a delegated tx).
@@ -603,12 +719,6 @@ checkFirewall(ReadView const& view, STTx const& tx, beast::Journal j)
             break;
     }
 
-    if (isPathingClassPayment(tx) || tt == ttCONFIDENTIAL_MPT_SEND)
-    {
-        JLOG(j.trace()) << "Firewall: pathing-class requires counterparty";
-        return requireFirewallCounterparty(view, tx, sleFw, j);
-    }
-
     if (tt == ttPAYMENT && tx.isFieldPresent(sfDestination) &&
         tx.getAccountID(sfDestination) == account)
     {
@@ -616,17 +726,33 @@ checkFirewall(ReadView const& view, STTx const& tx, beast::Journal j)
         return requireFirewallCounterparty(view, tx, sleFw, j);
     }
 
+    // Owner close/renew without a claim: remaining channel funds return to the
+    // owner. Do not require the channel destination to stay Withdraw-preauth'd.
+    if (tt == ttPAYCHAN_CLAIM && !tx.isFieldPresent(sfBalance))
+    {
+        JLOG(j.trace()) << "Firewall: PayChanClaim close/renew without claim";
+        return tesSUCCESS;
+    }
+
     auto const dest = extractFirewallDestination(tx, view);
+
+    // Deny before CP (including pathing / ConfidentialMPTSend).
+    if (dest.hasDestination && isWithdrawDenied(view, account, dest.destination))
+    {
+        JLOG(j.trace()) << "Firewall: destination on withdraw deny list";
+        return tecFIREWALL_BLOCK;
+    }
+
+    if (isPathingClassPayment(tx) || tt == ttCONFIDENTIAL_MPT_SEND)
+    {
+        JLOG(j.trace()) << "Firewall: pathing-class requires counterparty";
+        return requireFirewallCounterparty(view, tx, sleFw, j);
+    }
+
     if (!dest.hasDestination)
     {
         JLOG(j.trace()) << "Firewall: no destination; require counterparty";
         return requireFirewallCounterparty(view, tx, sleFw, j);
-    }
-
-    if (isWithdrawDenied(view, account, dest.destination))
-    {
-        JLOG(j.trace()) << "Firewall: destination on withdraw deny list";
-        return tecFIREWALL_BLOCK;
     }
 
     if (isWithdrawPreauthorized(view, account, dest.destination, dest.tag))
@@ -638,6 +764,154 @@ checkFirewall(ReadView const& view, STTx const& tx, beast::Journal j)
 
     JLOG(j.trace()) << "Firewall: destination not preauthorized; require counterparty";
     return requireFirewallCounterparty(view, tx, sleFw, j);
+}
+
+namespace {
+
+// Buy offer owner pays on buy-only and brokered NFTokenAcceptOffer.
+std::optional<AccountID>
+nftAcceptBuyOfferOwner(STTx const& tx, ReadView const& view)
+{
+    if (tx.getTxnType() != ttNFTOKEN_ACCEPT_OFFER)
+        return std::nullopt;
+    auto const buy = tx[~sfNFTokenBuyOffer];
+    if (!buy)
+        return std::nullopt;
+    auto const sle = view.read(keylet::nftokenOffer(*buy));
+    if (!sle)
+        return std::nullopt;
+    return sle->getAccountID(sfOwner);
+}
+
+TER
+sealAdditionalValueSubject(
+    ReadView const& view,
+    STTx const& tx,
+    AccountID const& account,
+    beast::Journal j)
+{
+    if (account == beast::kZero)
+        return tesSUCCESS;
+
+    if (hasFirewall(view, account))
+    {
+        auto const sleFw = view.read(keylet::firewall(account));
+        if (!sleFw)
+            return tesSUCCESS;
+        JLOG(j.trace()) << "Firewall: additional value subject requires counterparty";
+        return requireFirewallCounterparty(view, tx, sleFw, j);
+    }
+
+    auto const sle = view.read(keylet::account(account));
+    return verifyUncontrolledValueExit(view, account, sle, j);
+}
+
+}  // namespace
+
+TER
+checkAdditionalValueSubjects(ReadView const& view, STTx const& tx, beast::Journal j)
+{
+    // Primary subject remains sfAccount; seal reserve sponsor,
+    // SponsorshipSet CounterpartySponsor, and NFT buy/brokered buyer here.
+    AccountID const primary = firewallValueSubject(tx, view);
+
+    if (auto const sponsorID = getTxReserveSponsorID(tx); sponsorID && *sponsorID != primary)
+    {
+        if (auto const ter = sealAdditionalValueSubject(view, tx, *sponsorID, j);
+            !isTesSuccess(ter))
+            return ter;
+    }
+
+    if (tx.getTxnType() == ttSPONSORSHIP_SET)
+    {
+        if (auto const cs = tx[~sfCounterpartySponsor]; cs && *cs != primary)
+        {
+            if (auto const ter = sealAdditionalValueSubject(view, tx, *cs, j); !isTesSuccess(ter))
+                return ter;
+        }
+    }
+
+    // Buy/brokered buyer pays broker/issuer/seller; seal each payee.
+    if (auto const buyer = nftAcceptBuyOfferOwner(tx, view); buyer && *buyer != primary)
+    {
+        if (auto const sleFw = view.read(keylet::firewall(*buyer)))
+        {
+            std::vector<AccountID> payees;
+            auto addPayee = [&](AccountID const& id) {
+                if (id == beast::kZero || id == *buyer)
+                    return;
+                if (std::find(payees.begin(), payees.end(), id) == payees.end())
+                    payees.push_back(id);
+            };
+
+            bool const brokered =
+                tx[~sfNFTokenBuyOffer].has_value() && tx[~sfNFTokenSellOffer].has_value();
+            if (brokered)
+            {
+                // Broker is sfAccount; primary subject is the seller.
+                if (auto const cut = tx[~sfNFTokenBrokerFee]; cut && *cut != beast::kZero)
+                {
+                    if (tx.isFieldPresent(sfAccount))
+                        addPayee(tx.getAccountID(sfAccount));
+                }
+                if (auto const sleSell = view.read(keylet::nftokenOffer(*tx[~sfNFTokenSellOffer])))
+                {
+                    AccountID const seller = sleSell->getAccountID(sfOwner);
+                    addPayee(seller);
+                    auto const nftId = sleSell->getFieldH256(sfNFTokenID);
+                    if (nft::getTransferFee(nftId) != 0)
+                    {
+                        AccountID const issuer = nft::getIssuer(nftId);
+                        if (issuer != seller && issuer != *buyer)
+                            addPayee(issuer);
+                    }
+                }
+            }
+            else if (tx.isFieldPresent(sfAccount))
+            {
+                AccountID const seller = tx.getAccountID(sfAccount);
+                addPayee(seller);
+                if (auto const buy = tx[~sfNFTokenBuyOffer])
+                {
+                    if (auto const sleBuy = view.read(keylet::nftokenOffer(*buy)))
+                    {
+                        auto const nftId = sleBuy->getFieldH256(sfNFTokenID);
+                        if (nft::getTransferFee(nftId) != 0)
+                        {
+                            AccountID const issuer = nft::getIssuer(nftId);
+                            if (issuer != seller && issuer != *buyer)
+                                addPayee(issuer);
+                        }
+                    }
+                }
+            }
+
+            bool anyUnlisted = payees.empty();
+            for (AccountID const& payee : payees)
+            {
+                if (isWithdrawDenied(view, *buyer, payee))
+                {
+                    JLOG(j.trace()) << "Firewall: NFT buyer deny-list blocks payee";
+                    return tecFIREWALL_BLOCK;
+                }
+                if (!isWithdrawPreauthorized(view, *buyer, payee, 0))
+                    anyUnlisted = true;
+            }
+
+            if (!anyUnlisted)
+            {
+                JLOG(j.trace()) << "Firewall: NFT buyer payees preauthorized";
+                return tesSUCCESS;
+            }
+
+            JLOG(j.trace()) << "Firewall: NFT buy/brokered buyer requires counterparty";
+            if (auto const ter = requireFirewallCounterparty(view, tx, sleFw, j);
+                !isTesSuccess(ter))
+                return ter;
+        }
+    }
+
+    return tesSUCCESS;
 }
 
 TER

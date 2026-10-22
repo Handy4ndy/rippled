@@ -39,7 +39,8 @@ FirewallSet::preflight(PreflightContext const& ctx)
     {
         if (!ctx.tx.isFieldPresent(sfCounterparty) || !ctx.tx.isFieldPresent(sfBackup))
             return temMALFORMED;
-        if (ctx.tx.isFieldPresent(sfCounterpartySignature))
+        if (ctx.tx.isFieldPresent(sfCounterpartySignature) ||
+            ctx.tx.isFieldPresent(sfCounterpartySignatures))
             return temMALFORMED;
         if (!ctx.tx.isFieldPresent(sfMaxFee))
             return temMALFORMED;

@@ -36,7 +36,7 @@ signatureField(SignatureRole role)
 std::optional<SignatureRole>
 signatureRole(SField const& sigField)
 {
-    if (sigField == sfCounterpartySignature)
+    if (sigField == sfCounterpartySignature || sigField == sfCounterpartySig)
         return SignatureRole::Counterparty;
     if (sigField == sfSponsorSignature)
         return SignatureRole::Sponsor;

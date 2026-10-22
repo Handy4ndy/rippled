@@ -1,6 +1,7 @@
 #include <xrpl/tx/transactors/nft/NFTokenBurn.h>
 
 #include <xrpl/beast/utility/Journal.h>
+#include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/NFTokenHelpers.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/Protocol.h>
@@ -34,10 +35,23 @@ NFTokenBurn::preclaim(PreclaimContext const& ctx)
     if (!nft::findToken(ctx.view, owner, ctx.tx[sfNFTokenID]))
         return tecNO_ENTRY;
 
-    // The owner of a token can always burn it, but the issuer can only
-    // do so if the token is marked as burnable.
-    if (auto const account = ctx.tx[sfAccount]; owner != account)
+    auto const account = ctx.tx[sfAccount];
+
+    // Self-burn is an uncontrolled NFT exit under Payment Policy.
+    // Issuer/minter burn of a burnable token is clawback-like; soft PP does not
+    // gate it (Firewall still seals the submitter via block-class).
+    if (owner == account)
     {
+        if (auto const sleSrc = ctx.view.read(keylet::account(owner)))
+        {
+            if (auto err = verifyUncontrolledValueExit(ctx.view, owner, sleSrc, ctx.j);
+                !isTesSuccess(err))
+                return err;
+        }
+    }
+    else
+    {
+        // Issuer/minter may burn only when the token is marked burnable.
         if ((nft::getFlags(ctx.tx[sfNFTokenID]) & nft::kFlagBurnable) == 0)
             return tecNO_PERMISSION;
 

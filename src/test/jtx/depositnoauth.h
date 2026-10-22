@@ -8,7 +8,9 @@
 #include <cstdint>
 #include <optional>
 
-/** Deposit no-authorize operations */
+/**
+ * Deposit no-authorize operations.
+ */
 namespace xrpl::test::jtx::depositnoauth {
 
 json::Value

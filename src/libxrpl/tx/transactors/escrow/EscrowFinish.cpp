@@ -294,8 +294,8 @@ EscrowFinish::doApply()
         {
             auto const sleSrc = ctx_.view().read(keylet::account(ownerID));
             std::uint32_t const dtag = (*escrow)[~sfDestinationTag].valueOr(0);
-            if (auto err =
-                    verifyWithdrawAuth(ctx_.view(), ownerID, destID, sleSrc, ctx_.journal, dtag);
+            if (auto err = verifyWithdrawAuth(
+                    ctx_.view(), ctx_.tx, ownerID, destID, sleSrc, ctx_.journal, dtag);
                 !isTesSuccess(err))
                 return err;
         }
@@ -367,8 +367,8 @@ EscrowFinish::doApply()
         {
             auto const sleSrc = ctx_.view().read(keylet::account(ownerID));
             std::uint32_t const dtag = (*escrow)[~sfDestinationTag].valueOr(0);
-            if (auto err =
-                    verifyWithdrawAuth(ctx_.view(), ownerID, destID, sleSrc, ctx_.journal, dtag);
+            if (auto err = verifyWithdrawAuth(
+                    ctx_.view(), ctx_.tx, ownerID, destID, sleSrc, ctx_.journal, dtag);
                 !isTesSuccess(err))
                 return err;
         }

@@ -276,7 +276,7 @@ Batch::preflight(PreflightContext const& ctx)
             return temBAD_SIGNER;
         }
 
-        if (!sig.getFieldVL(sfSigningPubKey).empty())
+        if (sig.isFieldPresent(sfSigningPubKey) && !sig.getFieldVL(sfSigningPubKey).empty())
         {
             JLOG(j.debug()) << "BatchTrace[" << parentBatchId << "]: "
                             << "inner txn " << label << " SigningPubKey must be empty. "
@@ -326,8 +326,7 @@ Batch::preflight(PreflightContext const& ctx)
         if (auto const ret = checkSignatureFields(stx, hash))
             return ret;
 
-        // Note that the CounterpartySignature is optional, and should not be
-        // included, but if it is, ensure it doesn't contain a signature.
+        // Batch inners may not carry a usable CounterpartySignature(s).
         if (stx.isFieldPresent(sfCounterpartySignature))
         {
             auto const counterpartySignature = stx.getFieldObject(sfCounterpartySignature);
@@ -335,6 +334,19 @@ Batch::preflight(PreflightContext const& ctx)
                     checkSignatureFields(counterpartySignature, hash, "counterparty signature "))
             {
                 return ret;
+            }
+        }
+        if (stx.isFieldPresent(sfCounterpartySignatures))
+        {
+            for (auto const& entry : stx.getFieldArray(sfCounterpartySignatures))
+            {
+                STObject const& sigObj = entry.isFieldPresent(sfCounterpartySig)
+                    ? entry.getFieldObject(sfCounterpartySig)
+                    : entry;
+                if (auto const ret = checkSignatureFields(sigObj, hash, "counterparty signatures "))
+                {
+                    return ret;
+                }
             }
         }
         if (stx.isFieldPresent(sfSponsorSignature))

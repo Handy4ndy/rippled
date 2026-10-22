@@ -67,6 +67,7 @@ hasSignatureField(STObject const& proposedTx)
     return proposedTx.isFieldPresent(sfTxnSignature) || proposedTx.isFieldPresent(sfSigners) ||
         proposedTx.isFieldPresent(sfBatchSigners) ||
         proposedTx.isFieldPresent(sfCounterpartySignature) ||
+        proposedTx.isFieldPresent(sfCounterpartySignatures) ||
         proposedTx.isFieldPresent(sfSponsorSignature);
 }
 

@@ -325,7 +325,7 @@ CheckCash::doApply()
         auto const sleSrc = psb.read(keylet::account(srcId));
         auto const sleDst = psb.read(keylet::account(accountID_));
         std::uint32_t const dtag = (*sleCheck)->at(~sfDestinationTag).valueOr(0);
-        if (auto err = verifyWithdrawAuth(psb, srcId, accountID_, sleSrc, j_, dtag);
+        if (auto err = verifyWithdrawAuth(psb, ctx_.tx, srcId, accountID_, sleSrc, j_, dtag);
             !isTesSuccess(err))
             return err;
         if (auto err = checkDepositPreauth(

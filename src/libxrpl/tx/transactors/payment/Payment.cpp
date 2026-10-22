@@ -625,7 +625,13 @@ Payment::doApply()
             auto const sleSrcRipple = ctx_.view().read(keylet::account(accountID_));
             std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
             if (auto err = verifyWithdrawAuth(
-                    ctx_.view(), accountID_, dstAccountID, sleSrcRipple, ctx_.journal, dtag);
+                    ctx_.view(),
+                    ctx_.tx,
+                    accountID_,
+                    dstAccountID,
+                    sleSrcRipple,
+                    ctx_.journal,
+                    dtag);
                 !isTesSuccess(err))
                 return err;
         }
@@ -704,7 +710,7 @@ Payment::doApply()
             auto const sleSrcMpt = ctx_.view().read(keylet::account(accountID_));
             std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
             if (auto err = verifyWithdrawAuth(
-                    ctx_.view(), accountID_, dstAccountID, sleSrcMpt, ctx_.journal, dtag);
+                    ctx_.view(), ctx_.tx, accountID_, dstAccountID, sleSrcMpt, ctx_.journal, dtag);
                 !isTesSuccess(err))
                 return err;
         }
@@ -873,7 +879,7 @@ Payment::doApply()
         auto const sleSrcXrp = ctx_.view().read(keylet::account(accountID_));
         std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
         if (auto err = verifyWithdrawAuth(
-                ctx_.view(), accountID_, dstAccountID, sleSrcXrp, ctx_.journal, dtag);
+                ctx_.view(), ctx_.tx, accountID_, dstAccountID, sleSrcXrp, ctx_.journal, dtag);
             !isTesSuccess(err))
             return err;
     }

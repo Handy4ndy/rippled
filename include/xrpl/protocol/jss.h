@@ -40,7 +40,9 @@ JSS(BidMax);                      // in: AMM Bid
 JSS(BidMin);                      // in: AMM Bid
 JSS(ClearFlag);                   // field.
 JSS(Counterparty);                // field.
+JSS(CounterpartySig);             // field (element of CounterpartySignatures).
 JSS(CounterpartySignature);       // field.
+JSS(CounterpartySignatures);      // field (array of CounterpartySig).
 JSS(DeliverMax);                  // out: alias to Amount
 JSS(DeliverMin);                  // in: TransactionSign
 JSS(Destination);                 // in: TransactionSign; field.

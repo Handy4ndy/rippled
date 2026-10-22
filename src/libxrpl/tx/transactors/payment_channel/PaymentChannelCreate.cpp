@@ -116,7 +116,7 @@ PaymentChannelCreate::preclaim(PreclaimContext const& ctx)
             return tecNO_PERMISSION;
 
         std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
-        if (auto err = checkWithdrawAuth(ctx.view, account, dst, sle, ctx.j, dtag);
+        if (auto err = checkWithdrawAuth(ctx.view, ctx.tx, account, dst, sle, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
         // Classic DepositAuth is enforced on PaymentChannelClaim, matching

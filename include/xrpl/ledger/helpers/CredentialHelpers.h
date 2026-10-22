@@ -123,6 +123,7 @@ verifyDepositPreauth(
 TER
 checkWithdrawAuth(
     ReadView const& view,
+    STTx const& tx,
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleSrc,
@@ -132,6 +133,7 @@ checkWithdrawAuth(
 TER
 verifyWithdrawAuth(
     ApplyView& view,
+    STTx const& tx,
     AccountID const& src,
     AccountID const& dst,
     SLE::ConstRef sleSrc,

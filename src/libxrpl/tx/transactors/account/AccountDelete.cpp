@@ -348,7 +348,7 @@ AccountDelete::preclaim(PreclaimContext const& ctx)
     // postpone deposit to doApply so expired credentials can be cleaned there.
     {
         std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
-        if (auto err = checkWithdrawAuth(ctx.view, account, dst, sleAccount, ctx.j, dtag);
+        if (auto err = checkWithdrawAuth(ctx.view, ctx.tx, account, dst, sleAccount, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
     }
@@ -469,7 +469,8 @@ AccountDelete::doApply()
 
     {
         std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
-        if (auto err = verifyWithdrawAuth(ctx_.view(), accountID_, dstID, src, ctx_.journal, dtag);
+        if (auto err = verifyWithdrawAuth(
+                ctx_.view(), ctx_.tx, accountID_, dstID, src, ctx_.journal, dtag);
             !isTesSuccess(err))
             return err;
     }

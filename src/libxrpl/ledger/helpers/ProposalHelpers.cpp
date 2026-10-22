@@ -153,7 +153,7 @@ payloadMatches(STObject const& proposedTx, STObject const& tx)
 
     // The signing-payload serialization omits every kNotSigning field: the
     // signature containers a proposal lets evolve (TxnSignature, Signers,
-    // BatchSigners, CounterpartySignature, SponsorSignature) plus Signature
+    // BatchSigners, CounterpartySignature(s), SponsorSignature) plus Signature
     // and MasterSignature, which the account's own signature does not cover
     // either (see the header). What remains is the field set fixed at
     // creation — except SigningPubKey, which signing payloads include but

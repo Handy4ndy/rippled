@@ -90,7 +90,8 @@ checkValidity(HashRouter& router, STTx const& tx, Rules const& rules)
     // they are still covered by the transaction ID. Repeat calls for one ID
     // therefore always agree on which slot pair to use.
     bool const oldPrefixSig = !rules.enabled(fixCleanup3_4_0) &&
-        (tx.isFieldPresent(sfSponsorSignature) || tx.isFieldPresent(sfCounterpartySignature));
+        (tx.isFieldPresent(sfSponsorSignature) || tx.isFieldPresent(sfCounterpartySignature) ||
+         tx.isFieldPresent(sfCounterpartySignatures));
     auto const sigbadFlag = oldPrefixSig ? kSfSigbadOldPrefix : kSfSigbad;
     auto const siggoodFlag = oldPrefixSig ? kSfSiggoodOldPrefix : kSfSiggood;
 
