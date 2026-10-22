@@ -7,6 +7,7 @@
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -33,7 +34,6 @@ namespace xrpl {
 NotTEC
 DepositNoauth::preflight(PreflightContext const& ctx)
 {
-
     auto const optAuth = ctx.tx[~sfAuthorize];
     auto const optUnauth = ctx.tx[~sfUnauthorize];
     int const authPresent =
@@ -72,6 +72,9 @@ DepositNoauth::preclaim(PreclaimContext const& ctx)
 {
     AccountID const account(ctx.tx[sfAccount]);
 
+    if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, account, ctx.j);
+        !isTesSuccess(ter))
+        return ter;
 
     // Determine which operation we're performing: authorizing or unauthorizing.
     if (ctx.tx.isFieldPresent(sfUnauthorize))
@@ -138,8 +141,8 @@ DepositNoauth::doApply()
 
         view().insert(sleNoauth);
 
-        auto const page =
-            view().dirInsert(keylet::ownerDir(accountID_), noauthKeylet, describeOwnerDir(accountID_));
+        auto const page = view().dirInsert(
+            keylet::ownerDir(accountID_), noauthKeylet, describeOwnerDir(accountID_));
 
         JLOG(j_.trace()) << "Adding DepositNoauth to owner directory "
                          << to_string(noauthKeylet.key) << ": " << (page ? "success" : "failure");
@@ -196,8 +199,7 @@ DepositNoauth::removeFromLedger(ApplyView& view, uint256 const& noauthIndex, bea
 }
 
 void
-DepositNoauth::visitInvariantEntry(
-    bool, SLE::ConstRef, SLE::ConstRef)
+DepositNoauth::visitInvariantEntry(bool, SLE::ConstRef, SLE::ConstRef)
 {
 }
 

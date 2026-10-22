@@ -263,6 +263,8 @@ TOfferStreamBase<TIn, TOut>::step()
             continue;
         }
 
+        // WithdrawAuth / WithdrawNoauth / Firewall: resting offers are
+        // uncontrolled exits. Drop them on crossing, matching MPTCanTrade.
         if (accountBlocksUncontrolledExit(view_, offer_.owner()))
         {
             JLOG(j_.trace()) << "Removing offer blocked by outbound payment policy "

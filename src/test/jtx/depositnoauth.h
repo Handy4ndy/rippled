@@ -11,11 +11,12 @@
 /** Deposit no-authorize operations */
 namespace xrpl::test::jtx::depositnoauth {
 
-/** Add DepositNoauth (deny deposits). Invoke as depositnoauth::unauth. */
 json::Value
-unauth(jtx::Account const& account, jtx::Account const& unauth, std::optional<std::uint32_t> expiration = std::nullopt);
+unauth(
+    jtx::Account const& account,
+    jtx::Account const& unauth,
+    std::optional<std::uint32_t> expiration = std::nullopt);
 
-/** Remove DepositNoauth (allow deposits). Invoke as depositnoauth::auth. */
 json::Value
 auth(jtx::Account const& account, jtx::Account const& auth);
 

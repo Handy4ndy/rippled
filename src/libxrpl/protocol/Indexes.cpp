@@ -34,7 +34,7 @@ namespace xrpl {
 // This list should include all of the keylet functions that take a single
 // AccountID parameter. Declared in Indexes.h; defined here so the header need
 // not include jss.h.
-std::array<KeyletDesc<AccountID const&>, 10> const kDirectAccountKeylets{
+std::array<KeyletDesc<AccountID const&>, 11> const kDirectAccountKeylets{
     {{.function = &keylet::account, .expectedLEName = jss::AccountRoot, .includeInTests = false},
      {.function = &keylet::ownerDir, .expectedLEName = jss::DirectoryNode, .includeInTests = true},
      {.function = &keylet::signerList, .expectedLEName = jss::SignerList, .includeInTests = true},
@@ -58,6 +58,9 @@ std::array<KeyletDesc<AccountID const&>, 10> const kDirectAccountKeylets{
       .includeInTests = true},
      {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::withdrawSetPreauth),
       .expectedLEName = jss::WithdrawSetPreauth,
+      .includeInTests = true},
+     {.function = static_cast<Keylet (*)(AccountID const&) noexcept>(&keylet::firewall),
+      .expectedLEName = jss::Firewall,
       .includeInTests = true}}};
 
 /**
@@ -115,11 +118,12 @@ enum class LedgerNameSpace : std::uint16_t {
     DepositNoauth = 'k',
     DepositSetNoauth = 'w',
     DepositSetPreauth = 'W',
-    // 'y' is TransactionProposal. 'o' is Offer. 'F' stays free for Firewall.
+    // 'y' is TransactionProposal. 'o' is Offer.
     WithdrawPreauth = 'b',
     WithdrawNoauth = 'z',
     WithdrawSetNoauth = 'j',
     WithdrawSetPreauth = 'J',
+    Firewall = 'F',
 
     // No longer used or supported. Left here to reserve the space to avoid accidental reuse.
     Contract [[deprecated]] = 'c',
@@ -453,6 +457,12 @@ Keylet
 withdrawSetPreauth(AccountID const& owner) noexcept
 {
     return {ltWITHDRAW_SET_PREAUTH, indexHash(LedgerNameSpace::WithdrawSetPreauth, owner)};
+}
+
+Keylet
+firewall(AccountID const& owner) noexcept
+{
+    return {ltFIREWALL, indexHash(LedgerNameSpace::Firewall, owner)};
 }
 
 //------------------------------------------------------------------------------

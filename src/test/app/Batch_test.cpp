@@ -10,6 +10,7 @@
 #include <test/jtx/delegate.h>
 #include <test/jtx/envconfig.h>
 #include <test/jtx/fee.h>
+#include <test/jtx/firewall.h>
 #include <test/jtx/flags.h>
 #include <test/jtx/mpt.h>
 #include <test/jtx/multisign.h>
@@ -26,6 +27,7 @@
 #include <test/jtx/txflags.h>
 #include <test/jtx/utility.h>
 #include <test/jtx/vault.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpld/app/misc/Transaction.h>
 #include <xrpld/app/misc/TxQ.h>
@@ -6284,6 +6286,138 @@ class Batch_test : public beast::unit_test::Suite
     }
 
     void
+    testPaymentPolicyAndFirewall(FeatureBitset features)
+    {
+        testcase("Batch cannot bypass WithdrawAuth or Firewall");
+        using namespace test::jtx;
+
+        Env env{*this, features};
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        Account const carol{"carol"};
+        Account const cp{"cp"};
+        Account const backup{"backup"};
+        env.fund(XRP(10000), alice, bob, carol, cp, backup);
+        env.close();
+
+        auto const batchFee2 = batch::calcBatchFee(env, 0, 2);
+
+        // Soft WithdrawAuth: unlisted dest inner Payment does not move funds.
+        {
+            env(fset(alice, asfWithdrawAuth));
+            env.close();
+            auto const preAlice = env.balance(alice);
+            auto const preCarol = env.balance(carol);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfAllOrNothing),
+                batch::Inner(pay(alice, carol, XRP(10)), seq + 1),
+                batch::Inner(pay(alice, carol, XRP(1)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(alice) == preAlice - batchFee2);
+            BEAST_EXPECT(env.balance(carol) == preCarol);
+            BEAST_EXPECT(env.seq(alice) == seq + 1);
+        }
+
+        // Soft WithdrawAuth: preauth dest inner Payments apply.
+        {
+            env(withdrawauth::auth(alice, bob));
+            env.close();
+            auto const preBob = env.balance(bob);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfAllOrNothing),
+                batch::Inner(pay(alice, bob, XRP(1)), seq + 1),
+                batch::Inner(pay(alice, bob, XRP(1)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(bob) == preBob + XRP(2));
+        }
+
+        env(fset(alice, asfWithdrawAuth));
+        env.close();
+        env(firewall::setCreate(alice, cp, backup, 1'000'000));
+        env.close();
+
+        // Firewall: unlisted dest cannot be paid from a batch (no CP on inners).
+        {
+            auto const preCarol = env.balance(carol);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfAllOrNothing),
+                batch::Inner(pay(alice, carol, XRP(10)), seq + 1),
+                batch::Inner(pay(alice, carol, XRP(1)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(carol) == preCarol);
+        }
+
+        // Firewall: backup/preauth dest still seed-only inside a batch.
+        {
+            auto const preBackup = env.balance(backup);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfAllOrNothing),
+                batch::Inner(pay(alice, backup, XRP(1)), seq + 1),
+                batch::Inner(pay(alice, backup, XRP(1)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(backup) == preBackup + XRP(2));
+        }
+
+        // All-or-nothing: a blocked inner rolls back a good inner payment.
+        {
+            auto const preBackup = env.balance(backup);
+            auto const preCarol = env.balance(carol);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfAllOrNothing),
+                batch::Inner(pay(alice, backup, XRP(5)), seq + 1),
+                batch::Inner(pay(alice, carol, XRP(5)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(backup) == preBackup);
+            BEAST_EXPECT(env.balance(carol) == preCarol);
+        }
+
+        // Independent: good inner applies; blocked inner does not.
+        {
+            auto const preBackup = env.balance(backup);
+            auto const preCarol = env.balance(carol);
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfIndependent),
+                batch::Inner(pay(alice, backup, XRP(3)), seq + 1),
+                batch::Inner(pay(alice, carol, XRP(3)), seq + 2));
+            env.close();
+            BEAST_EXPECT(env.balance(backup) == preBackup + XRP(3));
+            BEAST_EXPECT(env.balance(carol) == preCarol);
+        }
+
+        // Block-class OfferCreate inside a batch still needs CP (inners cannot carry it).
+        {
+            Account const gw{"gw"};
+            env.fund(XRP(10000), gw);
+            env.close();
+            auto const USD = gw["USD"];
+            env(trust(alice, USD(1000)));
+            env.close();
+            env(pay(gw, alice, USD(50)));
+            env.close();
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, batchFee2, tfIndependent),
+                batch::Inner(pay(alice, backup, XRP(1)), seq + 1),
+                batch::Inner(offer(alice, XRP(10), USD(10)), seq + 2));
+            env.close();
+            BEAST_EXPECT(
+                env.le(keylet::offer(alice.id(), SeqProxy::rawSequence(seq + 2))) == nullptr);
+        }
+
+        // Outer Batch fee still hits MaxFee; inners cannot hide a large fee.
+        {
+            auto const fwId = keylet::firewall(alice.id()).key;
+            env(firewall::setUpdateMaxFee(alice, fwId, 1000), Sig(sfCounterpartySignature, cp));
+            env.close();
+            auto const seq = env.seq(alice);
+            env(batch::outer(alice, seq, XRP(1), tfAllOrNothing),
+                batch::Inner(pay(alice, backup, XRP(1)), seq + 1),
+                batch::Inner(pay(alice, backup, XRP(1)), seq + 2),
+                Ter(tefFIREWALL_MAX_FEE));
+            env.close();
+        }
+    }
+
+    void
     testWrappedInnerSubmission(FeatureBitset features)
     {
         testcase("wrapper field submission");
@@ -6397,6 +6531,7 @@ class Batch_test : public beast::unit_test::Suite
         testBatchCalculateBaseFee(features);
         testStandaloneInnerBatchFlag(features);
         testOuterBinding(features);
+        testPaymentPolicyAndFirewall(features);
         testUnsortedBatchSigners(features);
         testBatchSigCache(features);
         testWrappedInnerSubmission(features);

@@ -5,6 +5,7 @@
 #include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -34,14 +35,9 @@ isWhitelist(STTx const& tx)
     return tx.getTxnType() == ttWITHDRAW_PREAUTH;
 }
 
-// ---------------------------------------------------------------------------
-// preflight
-// ---------------------------------------------------------------------------
-
 NotTEC
 WithdrawAuthorization::preflight(PreflightContext const& ctx)
 {
-
     auto const optAuth = ctx.tx[~sfAuthorize];
     auto const optUnauth = ctx.tx[~sfUnauthorize];
     int const authPresent =
@@ -85,10 +81,6 @@ WithdrawAuthorization::preflight(PreflightContext const& ctx)
     return tesSUCCESS;
 }
 
-// ---------------------------------------------------------------------------
-// preclaim
-// ---------------------------------------------------------------------------
-
 // DestinationTag for WithdrawPreauth keylet: 0 when absent (XLS-0086).
 static std::uint32_t
 preauthDestTag(STTx const& tx)
@@ -102,6 +94,10 @@ TER
 WithdrawAuthorization::preclaim(PreclaimContext const& ctx)
 {
     AccountID const account(ctx.tx[sfAccount]);
+
+    if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, account, ctx.j);
+        !isTesSuccess(ter))
+        return ter;
 
     if (isWhitelist(ctx.tx))
     {
@@ -119,8 +115,7 @@ WithdrawAuthorization::preclaim(PreclaimContext const& ctx)
         }
         else if (ctx.tx.isFieldPresent(sfUnauthorize))
         {
-            if (!ctx.view.exists(
-                    keylet::withdrawPreauth(account, ctx.tx[sfUnauthorize], tag)))
+            if (!ctx.view.exists(keylet::withdrawPreauth(account, ctx.tx[sfUnauthorize], tag)))
                 return tecNO_ENTRY;
         }
     }
@@ -158,10 +153,6 @@ WithdrawAuthorization::preclaim(PreclaimContext const& ctx)
     return tesSUCCESS;
 }
 
-// ---------------------------------------------------------------------------
-// doApply
-// ---------------------------------------------------------------------------
-
 TER
 WithdrawAuthorization::doApply()
 {
@@ -169,7 +160,7 @@ WithdrawAuthorization::doApply()
 
     // Whitelist: sfAuthorize  = add entry, sfUnauthorize = remove entry.
     // Blacklist: sfUnauthorize = add entry, sfAuthorize  = remove entry.
-    bool const hasAdd    = ctx_.tx.isFieldPresent(whitelist ? sfAuthorize   : sfUnauthorize);
+    bool const hasAdd = ctx_.tx.isFieldPresent(whitelist ? sfAuthorize : sfUnauthorize);
     bool const hasRemove = ctx_.tx.isFieldPresent(whitelist ? sfUnauthorize : sfAuthorize);
 
     if (hasAdd)
@@ -185,13 +176,11 @@ WithdrawAuthorization::doApply()
             return ret;
 
         // Use typed field access directly so operator[] compiles.
-        AccountID const target =
-            whitelist ? ctx_.tx[sfAuthorize] : ctx_.tx[sfUnauthorize];
+        AccountID const target = whitelist ? ctx_.tx[sfAuthorize] : ctx_.tx[sfUnauthorize];
 
         std::uint32_t const tag = whitelist ? preauthDestTag(ctx_.tx) : 0;
-        Keylet const entryKeylet =
-            whitelist ? keylet::withdrawPreauth(accountID_, target, tag)
-                      : keylet::withdrawNoauth(accountID_, target);
+        Keylet const entryKeylet = whitelist ? keylet::withdrawPreauth(accountID_, target, tag)
+                                             : keylet::withdrawNoauth(accountID_, target);
 
         auto sleEntry = std::make_shared<SLE>(entryKeylet);
         sleEntry->setAccountID(sfAccount, accountID_);
@@ -217,10 +206,8 @@ WithdrawAuthorization::doApply()
         auto const page = view().dirInsert(
             keylet::ownerDir(accountID_), entryKeylet, describeOwnerDir(accountID_));
 
-        JLOG(j_.trace()) << "Adding "
-                         << (whitelist ? "WithdrawPreauth" : "WithdrawNoauth")
-                         << " to owner directory "
-                         << to_string(entryKeylet.key) << ": "
+        JLOG(j_.trace()) << "Adding " << (whitelist ? "WithdrawPreauth" : "WithdrawNoauth")
+                         << " to owner directory " << to_string(entryKeylet.key) << ": "
                          << (page ? "success" : "failure");
 
         if (!page)
@@ -247,10 +234,6 @@ WithdrawAuthorization::doApply()
 
     return tesSUCCESS;
 }
-
-// ---------------------------------------------------------------------------
-// removePreauthFromLedger  (used by AccountDelete for ltWITHDRAW_PREAUTH)
-// ---------------------------------------------------------------------------
 
 TER
 WithdrawAuthorization::removePreauthFromLedger(
@@ -285,10 +268,6 @@ WithdrawAuthorization::removePreauthFromLedger(
     return tesSUCCESS;
 }
 
-// ---------------------------------------------------------------------------
-// removeNoauthFromLedger  (used by AccountDelete for ltWITHDRAW_NOAUTH)
-// ---------------------------------------------------------------------------
-
 TER
 WithdrawAuthorization::removeNoauthFromLedger(
     ApplyView& view,
@@ -322,13 +301,8 @@ WithdrawAuthorization::removeNoauthFromLedger(
     return tesSUCCESS;
 }
 
-// ---------------------------------------------------------------------------
-// Invariant stubs
-// ---------------------------------------------------------------------------
-
 void
-WithdrawAuthorization::visitInvariantEntry(
-    bool, SLE::ConstRef, SLE::ConstRef)
+WithdrawAuthorization::visitInvariantEntry(bool, SLE::ConstRef, SLE::ConstRef)
 {
 }
 

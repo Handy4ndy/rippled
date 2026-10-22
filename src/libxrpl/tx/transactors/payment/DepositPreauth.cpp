@@ -8,6 +8,7 @@
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -98,6 +99,10 @@ TER
 DepositPreauth::preclaim(PreclaimContext const& ctx)
 {
     AccountID const account(ctx.tx[sfAccount]);
+
+    if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, account, ctx.j);
+        !isTesSuccess(ter))
+        return ter;
 
     // Determine which operation we're performing: authorizing or unauthorizing.
     if (ctx.tx.isFieldPresent(sfAuthorize))

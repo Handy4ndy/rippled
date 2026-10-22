@@ -58,6 +58,7 @@ TRANSACTION(ttPAYMENT, 0, Payment,
     {sfDeliverMin, SoeOptional, SoeMptSupported},
     {sfCredentialIDs, SoeOptional},
     {sfDomainID, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type creates an escrow object. */
@@ -73,6 +74,7 @@ TRANSACTION(ttESCROW_CREATE, 1, EscrowCreate, ({.delegable = Delegation::Delegab
     {sfFinishAfter, SoeOptional},
     {sfBytecode, SoeOptional},
     {sfData, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type completes an existing escrow. */
@@ -86,6 +88,7 @@ TRANSACTION(ttESCROW_FINISH, 2, EscrowFinish, ({.delegable = Delegation::Delegab
     {sfCondition, SoeOptional},
     {sfCredentialIDs, SoeOptional},
     {sfGas, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 
@@ -106,6 +109,7 @@ TRANSACTION(ttACCOUNT_SET, 3, AccountSet,
     {sfClearFlag, SoeOptional},
     {sfTickSize, SoeOptional},
     {sfNFTokenMinter, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type cancels an existing escrow. */
@@ -125,6 +129,7 @@ TRANSACTION(ttREGULAR_KEY_SET, 5, SetRegularKey,
     ({}),
     ({
     {sfRegularKey, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 // 6 deprecated
@@ -141,6 +146,7 @@ TRANSACTION(ttOFFER_CREATE, 7, OfferCreate,
     {sfExpiration, SoeOptional},
     {sfOfferSequence, SoeOptional},
     {sfDomainID, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type cancels existing offers to trade one asset for another. */
@@ -174,6 +180,7 @@ TRANSACTION(ttSIGNER_LIST_SET, 12, SignerListSet,
     ({
     {sfSignerQuorum, SoeRequired},
     {sfSignerEntries, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type creates a new unidirectional XRP payment channel. */
@@ -187,6 +194,7 @@ TRANSACTION(ttPAYCHAN_CREATE, 13, PaymentChannelCreate, ({.delegable = Delegatio
     {sfPublicKey, SoeRequired},
     {sfCancelAfter, SoeOptional},
     {sfDestinationTag, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type funds an existing unidirectional XRP payment channel. */
@@ -197,6 +205,7 @@ TRANSACTION(ttPAYCHAN_FUND, 14, PaymentChannelFund, ({.delegable = Delegation::D
     {sfChannel, SoeRequired},
     {sfAmount, SoeRequired},
     {sfExpiration, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type submits a claim against an existing unidirectional payment channel. */
@@ -223,6 +232,7 @@ TRANSACTION(ttCHECK_CREATE, 16, CheckCreate, ({.delegable = Delegation::Delegabl
     {sfExpiration, SoeOptional},
     {sfDestinationTag, SoeOptional},
     {sfInvoiceID, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type cashes an existing check. */
@@ -235,6 +245,7 @@ TRANSACTION(ttCHECK_CASH, 17, CheckCash,
     {sfCheckID, SoeRequired},
     {sfAmount, SoeOptional, SoeMptSupported},
     {sfDeliverMin, SoeOptional, SoeMptSupported},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type cancels an existing check. */
@@ -254,6 +265,7 @@ TRANSACTION(ttDEPOSIT_PREAUTH, 19, DepositPreauth, ({.delegable = Delegation::De
     {sfUnauthorize, SoeOptional},
     {sfAuthorizeCredentials, SoeOptional},
     {sfUnauthorizeCredentials, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type modifies a trustline between two accounts. */
@@ -278,6 +290,7 @@ TRANSACTION(ttACCOUNT_DELETE, 21, AccountDelete,
     {sfDestination, SoeRequired},
     {sfDestinationTag, SoeOptional},
     {sfCredentialIDs, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 // 22 reserved
@@ -292,6 +305,7 @@ TRANSACTION(ttDEPOSIT_NOAUTH, 23, DepositNoauth,
     {sfAuthorize, SoeOptional},
     {sfUnauthorize, SoeOptional},
     {sfExpiration, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction mints a new NFT. */
@@ -332,6 +346,7 @@ TRANSACTION(ttNFTOKEN_CREATE_OFFER, 27, NFTokenCreateOffer, ({.delegable = Deleg
     {sfDestination, SoeOptional},
     {sfOwner, SoeOptional},
     {sfExpiration, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction cancels an existing offer to buy or sell an existing NFT. */
@@ -350,6 +365,7 @@ TRANSACTION(ttNFTOKEN_ACCEPT_OFFER, 29, NFTokenAcceptOffer, ({.delegable = Deleg
     {sfNFTokenBuyOffer, SoeOptional},
     {sfNFTokenSellOffer, SoeOptional},
     {sfNFTokenBrokerFee, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction claws back issued tokens. */
@@ -393,6 +409,7 @@ TRANSACTION(ttAMM_CREATE, 35, AMMCreate,
     {sfAmount, SoeRequired, SoeMptSupported},
     {sfAmount2, SoeRequired, SoeMptSupported},
     {sfTradingFee, SoeRequired},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type deposits into an AMM instance */
@@ -746,6 +763,7 @@ TRANSACTION(ttVAULT_DEPOSIT, 68, VaultDeposit,
     ({
     {sfVaultID, SoeRequired},
     {sfAmount, SoeRequired, SoeMptSupported},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction trades shares for assets with a vault. */
@@ -764,6 +782,7 @@ TRANSACTION(ttVAULT_WITHDRAW, 69, VaultWithdraw,
     {sfDestination, SoeOptional},
     {sfDestinationTag, SoeOptional},
     {sfCredentialIDs, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction claws back tokens from a vault. */
@@ -964,6 +983,7 @@ TRANSACTION(ttCONFIDENTIAL_MPT_CONVERT, 85, ConfidentialMPTConvert,
     {sfAuditorEncryptedAmount, SoeOptional},
     {sfBlindingFactor, SoeRequired},
     {sfZKProof, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type merges MPT inbox. */
@@ -974,6 +994,7 @@ TRANSACTION(ttCONFIDENTIAL_MPT_MERGE_INBOX, 86, ConfidentialMPTMergeInbox,
     ({.delegable = Delegation::Delegable, .amendment = featureConfidentialTransfer}),
     ({
     {sfMPTokenIssuanceID, SoeRequired},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction type converts back into public MPT balance. */
@@ -991,6 +1012,7 @@ TRANSACTION(ttCONFIDENTIAL_MPT_CONVERT_BACK, 87, ConfidentialMPTConvertBack,
     {sfBlindingFactor, SoeRequired},
     {sfZKProof, SoeRequired},
     {sfBalanceCommitment, SoeRequired},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 #if TRANSACTION_INCLUDE
@@ -1010,6 +1032,7 @@ TRANSACTION(ttCONFIDENTIAL_MPT_SEND, 88, ConfidentialMPTSend,
     {sfAmountCommitment, SoeRequired},
     {sfBalanceCommitment, SoeRequired},
     {sfCredentialIDs, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 #if TRANSACTION_INCLUDE
@@ -1035,6 +1058,7 @@ TRANSACTION(ttSPONSORSHIP_TRANSFER, 90, SponsorshipTransfer,
     ({
     {sfObjectID, SoeOptional},
     {sfSponsee, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** This transaction creates a Sponsorship object. */
@@ -1049,6 +1073,7 @@ TRANSACTION(ttSPONSORSHIP_SET, 91, SponsorshipSet,
     {sfFeeAmountDelta, SoeOptional},
     {sfMaxFee, SoeOptional},
     {sfRemainingOwnerCountDelta, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 #if TRANSACTION_INCLUDE
@@ -1161,6 +1186,7 @@ TRANSACTION(ttDEPOSIT_SETAUTH, 103, DepositSetauth,
     ({.delegable = Delegation::Delegable, .amendment = featurePaymentPolicy}),
     ({
     {sfProviders, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** Authorize (or de-authorize) an account to receive outgoing payments. */
@@ -1173,6 +1199,7 @@ TRANSACTION(ttWITHDRAW_PREAUTH, 104, WithdrawPreauth,
     {sfAuthorize, SoeOptional},
     {sfUnauthorize, SoeOptional},
     {sfDestinationTag, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** Deny (or remove the denial of) an account from receiving outgoing payments. */
@@ -1185,6 +1212,7 @@ TRANSACTION(ttWITHDRAW_NOAUTH, 105, WithdrawNoauth,
     {sfAuthorize, SoeOptional},
     {sfUnauthorize, SoeOptional},
     {sfExpiration, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
 }))
 
 /** Outbound provider Setauth (mirror of DepositSetauth). */
@@ -1195,4 +1223,32 @@ TRANSACTION(ttWITHDRAW_SETAUTH, 106, WithdrawSetauth,
     ({.delegable = Delegation::NotDelegable, .amendment = featurePaymentPolicy}),
     ({
     {sfProviders, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
+}))
+
+/** Create or update an account firewall. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/FirewallSet.h>
+#endif
+TRANSACTION(ttFIREWALL_SET, 107, FirewallSet,
+    ({.amendment = featureFirewall}),
+    ({
+    {sfFirewallID, SoeOptional},
+    {sfCounterparty, SoeOptional},
+    {sfBackup, SoeOptional},
+    {sfMaxFee, SoeOptional},
+    {sfMaxAmount, SoeOptional},
+    {sfDestinationTag, SoeOptional},
+    {sfCounterpartySignature, SoeOptional},
+}))
+
+/** Delete an account firewall. */
+#if TRANSACTION_INCLUDE
+#   include <xrpl/tx/transactors/payment/FirewallDelete.h>
+#endif
+TRANSACTION(ttFIREWALL_DELETE, 108, FirewallDelete,
+    ({.amendment = featureFirewall}),
+    ({
+    {sfFirewallID, SoeRequired},
+    {sfCounterpartySignature, SoeOptional},
 }))

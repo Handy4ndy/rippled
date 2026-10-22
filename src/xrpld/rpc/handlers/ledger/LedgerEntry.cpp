@@ -466,6 +466,21 @@ parseWithdrawSetPreauth(
     return keylet::withdrawSetPreauth(*owner).key;
 }
 
+static std::expected<uint256, json::Value>
+parseFirewall(
+    json::Value const& params,
+    json::StaticString const fieldName,
+    [[maybe_unused]] unsigned const apiVersion)
+{
+    if (!params.isObject())
+        return parseObjectID(params, fieldName);
+    auto const owner =
+        ledger_entry_helpers::requiredAccountID(params, jss::owner, "malformedOwner");
+    if (!owner)
+        return std::unexpected(owner.error());
+    return keylet::firewall(*owner).key;
+}
+
 static std::expected<UInt256, json::Value>
 parseDID(
     json::Value const& params,

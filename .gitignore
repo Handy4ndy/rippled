@@ -38,7 +38,12 @@ gmon.out
 # Customized configs.
 /rippled.cfg
 /xrpld.cfg
+
 /validators.txt
+
+# Local standalone node and private cluster. Kept on this machine, not published.
+/standalone/
+/devnet/
 
 # Locally patched Conan recipes
 external/conan-center-index/

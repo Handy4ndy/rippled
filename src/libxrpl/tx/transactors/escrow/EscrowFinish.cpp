@@ -372,7 +372,6 @@ EscrowFinish::doApply()
                 !isTesSuccess(err))
                 return err;
         }
-
         if (auto err =
                 verifyDepositPreauth(ctx_.tx, ctx_.view(), ownerID, destID, sled, ctx_.journal);
             !isTesSuccess(err))

@@ -12,6 +12,7 @@
 #include <test/jtx/ter.h>
 #include <test/jtx/ticket.h>
 #include <test/jtx/txflags.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpl/basics/Slice.h>
 #include <xrpl/beast/unit_test/suite.h>
@@ -1657,6 +1658,30 @@ struct Escrow_test : public beast::unit_test::Suite
     }
 
     void
+    testWithdrawAuth(FeatureBitset features)
+    {
+        testcase("WithdrawAuth blocks EscrowCreate to unlisted dest");
+        using namespace jtx;
+        using namespace std::chrono;
+        Env env(*this, features);
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        Account const carol{"carol"};
+        env.fund(XRP(10000), alice, bob, carol);
+        env.close();
+        env(fset(alice, asfWithdrawAuth));
+        env.close();
+        env(escrow::create(alice, carol, XRP(10)),
+            escrow::kFinishTime(env.now() + 1s),
+            Ter(tecNO_PERMISSION));
+        env.close();
+        env(withdrawauth::auth(alice, bob));
+        env.close();
+        env(escrow::create(alice, bob, XRP(10)), escrow::kFinishTime(env.now() + 1s));
+        env.close();
+    }
+
+    void
     testWithFeats(FeatureBitset features)
     {
         testEnablement(features);
@@ -1671,6 +1696,7 @@ struct Escrow_test : public beast::unit_test::Suite
         testConsequences(features);
         testEscrowWithTickets(features);
         testCredentials(features);
+        testWithdrawAuth(features);
     }
 
 public:

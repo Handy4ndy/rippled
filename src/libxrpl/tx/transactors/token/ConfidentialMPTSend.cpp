@@ -289,6 +289,14 @@ ConfidentialMPTSend::preclaim(PreclaimContext const& ctx)
         !isTesSuccess(err))
         return err;
 
+    {
+        auto const sleSrc = ctx.view.read(keylet::account(account));
+        std::uint32_t const dtag = ctx.tx[~sfDestinationTag].value_or(0);
+        if (auto const err = checkWithdrawAuth(ctx.view, account, destination, sleSrc, ctx.j, dtag);
+            !isTesSuccess(err))
+            return err;
+    }
+
     // Check deposit preauth before the expensive ZK proof verification.
     // Uses read-only view.
     auto const preauthErr =
@@ -310,6 +318,7 @@ ConfidentialMPTSend::doApply()
     auto const sleIssuance = view().read(keylet::mptokenIssuance(mptIssuanceID));
 
     auto const sleDestAcct = view().read(keylet::account(destination));
+    auto const sleSrcAcct = view().read(keylet::account(accountID_));
 
     if (!sleSenderMPToken || !sleDestinationMPToken || !sleIssuance || !sleDestAcct)
     {
@@ -321,10 +330,21 @@ ConfidentialMPTSend::doApply()
         // LCOV_EXCL_STOP
     }
 
+    {
+        std::uint32_t const dtag = ctx_.tx[~sfDestinationTag].value_or(0);
+        if (auto const err =
+                verifyWithdrawAuth(view(), accountID_, destination, sleSrcAcct, j_, dtag);
+            !isTesSuccess(err))
+            return err;
+        if (auto const err =
+                verifyDepositPreauth(ctx_.tx, view(), accountID_, destination, sleDestAcct, j_);
+            !isTesSuccess(err))
+            return err;
+    }
+
     // Deposit preauth authorization was already verified in preclaim.
     // Remove any expired credentials.
-    if (auto err = cleanupExpiredCredentials(ctx_.tx, ctx_.view(), ctx_.journal);
-        !isTesSuccess(err))
+    if (auto err = cleanupExpiredCredentials(ctx_.tx, view(), j_); !isTesSuccess(err))
         return err;
 
     auto const senderEc = ctx_.tx[sfSenderEncryptedAmount];

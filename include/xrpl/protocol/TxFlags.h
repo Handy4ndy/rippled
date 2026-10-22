@@ -254,6 +254,10 @@ inline constexpr FlagValue tfUniversalMask = ~tfUniversal;
     TRANSACTION(WithdrawSetauth,                                                                                                                               \
         TF_FLAG2(tfSetNoauthList, 0x00010000)                                                                                                                  \
         TF_FLAG2(tfSetPreauthList, 0x00020000),                                                                                                                \
+        MASK_ADJ(0))                                                                                                                                           \
+                                                                                                                                                               \
+    TRANSACTION(FirewallDelete,                                                                                                                                \
+        TF_FLAG(tfClearWithdrawLists, 0x00010000),                                                                                                             \
         MASK_ADJ(0))
 
 // clang-format on
@@ -449,7 +453,7 @@ inline constexpr FlagValue tfDepositSubTx =
     ASF_FLAG(asfDisallowIncomingPayChan, 14)      \
     ASF_FLAG(asfDisallowIncomingTrustline, 15)    \
     ASF_FLAG(asfAllowTrustLineClawback, 16)       \
-    ASF_FLAG(asfAllowTrustLineLocking, 17)       \
+    ASF_FLAG(asfAllowTrustLineLocking, 17)        \
     ASF_FLAG(asfDepositNoauth, 18)                \
     ASF_FLAG(asfWithdrawAuth, 19)                 \
     ASF_FLAG(asfWithdrawNoauth, 20)

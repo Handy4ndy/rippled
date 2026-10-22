@@ -7,6 +7,7 @@
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/LedgerFormats.h>
@@ -175,6 +176,26 @@ AccountSet::preclaim(PreclaimContext const& ctx)
         return terNO_ACCOUNT;
 
     std::uint32_t const uSetFlag = ctx.tx.getFieldU32(sfSetFlag);
+    std::uint32_t const uClearFlagEarly = ctx.tx.getFieldU32(sfClearFlag);
+
+    if (hasFirewall(ctx.view, id) && uClearFlagEarly == asfWithdrawAuth)
+    {
+        JLOG(ctx.j.trace()) << "AccountSet: cannot clear asfWithdrawAuth while Firewall is enabled";
+        return tecFIREWALL_ACTIVE;
+    }
+
+    if (hasFirewall(ctx.view, id) && accountSetTouchesKeySeal(ctx.tx))
+    {
+        JLOG(ctx.j.trace()) << "AccountSet: DisableMaster sealed while Firewall is enabled";
+        return tecFIREWALL_ACTIVE;
+    }
+
+    if (accountSetTouchesSealedFlags(ctx.tx))
+    {
+        if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, id, ctx.j);
+            !isTesSuccess(ter))
+            return ter;
+    }
 
     // legacy AccountSet flags
     bool const bSetRequireAuth = ctx.tx.isFlag(tfRequireAuth) || (uSetFlag == asfRequireAuth);

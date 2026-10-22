@@ -80,6 +80,8 @@ verifyValidDomain(ApplyView& view, AccountID const& account, UInt256 domainID, b
  * @param dst Destination account.
  * @param sleDst Destination AccountRoot, if it exists.
  * @param j Journal for diagnostics.
+ * @param skipAllowForUnwedge If true, skip classic DepositAuth (Check/PayChan/
+ *        Escrow create, dest-signed cash). DepositNoauth is still enforced.
  * @return tesSUCCESS if the deposit is allowed, otherwise an authorization
  *         error.
  */

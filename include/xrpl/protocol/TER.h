@@ -186,6 +186,7 @@ enum TEFcodes : TERUnderlyingType {
     tefBYTECODE_NOT_INCLUDED,
     tefTEMP_DISABLED,
     tefEXCEEDS_LIMIT,
+    tefFIREWALL_MAX_FEE,  // Fee exceeds Firewall MaxFee
 };
 
 //------------------------------------------------------------------------------
@@ -383,6 +384,10 @@ enum TECcodes : TERUnderlyingType {
     tecBYTECODE_REJECTED = 202,
     tecDEPOSIT_NOAUTH = 203,
     tecWITHDRAW_NOAUTH = 204,
+    tecREQUIRES_FLAG = 205,
+    tecREQUIRES_COUNTERPARTY = 206,
+    tecFIREWALL_ACTIVE = 207,
+    tecFIREWALL_BLOCK = 208,
 };
 
 //------------------------------------------------------------------------------

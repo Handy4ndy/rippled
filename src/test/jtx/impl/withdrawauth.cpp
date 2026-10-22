@@ -65,10 +65,7 @@ clearNoauth(jtx::Account const& account, jtx::Account const& authorize)
 }
 
 json::Value
-setauth(
-    jtx::Account const& account,
-    std::vector<jtx::Account> const& providers,
-    bool noauthList)
+setauth(jtx::Account const& account, std::vector<jtx::Account> const& providers, bool noauthList)
 {
     json::Value jv;
     jv[sfAccount.jsonName] = account.human();

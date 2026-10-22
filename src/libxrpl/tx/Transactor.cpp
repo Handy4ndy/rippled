@@ -16,6 +16,7 @@
 #include <xrpl/ledger/helpers/DelegateHelpers.h>
 #include <xrpl/ledger/helpers/NFTokenHelpers.h>
 #include <xrpl/ledger/helpers/OfferHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/ProposalHelpers.h>
 #include <xrpl/ledger/helpers/RippleStateHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
@@ -470,7 +471,17 @@ Transactor::calculateBaseFee(ReadView const& view, STTx const& tx)
             sponsorSignerCount += sponsorObj.getFieldArray(sfSigners).size();
     }
 
-    return baseFee + ((signerCount + sponsorSignerCount) * baseFee);
+    // Firewall CounterpartySignature: match SponsorSignature and charge one
+    // base fee per listed multisigner. A single-key cosign does not add fee.
+    std::size_t counterpartySignerCount = 0;
+    if (tx.isFieldPresent(sfCounterpartySignature))
+    {
+        auto const cpObj = tx.getFieldObject(sfCounterpartySignature);
+        if (cpObj.isFieldPresent(sfSigners))
+            counterpartySignerCount += cpObj.getFieldArray(sfSigners).size();
+    }
+
+    return baseFee + ((signerCount + sponsorSignerCount + counterpartySignerCount) * baseFee);
 }
 
 XRPAmount
@@ -944,7 +955,13 @@ Transactor::apply()
         view().update(sle);
     }
 
-    return doApply();
+    TER const applied = doApply();
+    if (isTesSuccess(applied))
+    {
+        if (TER const cap = applyFirewallAmountCap(view(), ctx_.tx, j_); !isTesSuccess(cap))
+            return cap;
+    }
+    return applied;
 }
 
 NotTEC

@@ -24,6 +24,7 @@
 #include <test/jtx/trust.h>
 #include <test/jtx/txflags.h>
 #include <test/jtx/vault.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/chrono.h>
@@ -1135,6 +1136,30 @@ public:
     }
 
     void
+    testWithdrawAuth()
+    {
+        testcase("WithdrawAuth requires preauth for AccountDelete dest");
+        using namespace jtx;
+        Env env(*this);
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        env.fund(XRP(10000), alice, bob);
+        env.close();
+        env(fset(alice, asfWithdrawAuth));
+        env.close();
+        auto const fee = drops(env.current()->fees().increment);
+        incLgrSeqForAccDel(env, alice);
+        env(acctdelete(alice, bob), Fee(fee), Ter(tecNO_PERMISSION));
+        env.close();
+        env(withdrawauth::auth(alice, bob));
+        env.close();
+        incLgrSeqForAccDel(env, alice);
+        env(acctdelete(alice, bob), Fee(fee));
+        env.close();
+        BEAST_EXPECT(!env.closed()->exists(keylet::account(alice.id())));
+    }
+
+    void
     run() override
     {
         auto const all{jtx::testableAmendments()};
@@ -1149,6 +1174,7 @@ public:
         testDest(all - fixCleanup3_3_0);
         testDestinationDepositAuthCredentials();
         testDeleteCredentialsOwner();
+        testWithdrawAuth();
     }
 };
 

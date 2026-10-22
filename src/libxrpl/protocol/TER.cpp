@@ -112,6 +112,10 @@ transResults()
         MAKE_ERROR(tecBYTECODE_REJECTED,             "The custom WASM code that was run rejected your transaction."),
         MAKE_ERROR(tecDEPOSIT_NOAUTH,                "Destination has denied this sender (DepositNoauth)."),
         MAKE_ERROR(tecWITHDRAW_NOAUTH,               "Source has denied this destination (WithdrawNoauth)."),
+        MAKE_ERROR(tecREQUIRES_FLAG,                 "Required account flag is not enabled."),
+        MAKE_ERROR(tecREQUIRES_COUNTERPARTY,         "Firewall requires a valid CounterpartySignature."),
+        MAKE_ERROR(tecFIREWALL_ACTIVE,               "Operation is not permitted while Firewall is enabled."),
+        MAKE_ERROR(tecFIREWALL_BLOCK,                "Firewall denied this destination."),
 
         MAKE_ERROR(tefALREADY,                     "The exact transaction was already in this ledger."),
         MAKE_ERROR(tefBAD_ADD_AUTH,                "Not authorized to add account."),
@@ -141,6 +145,7 @@ transResults()
         MAKE_ERROR(tefBYTECODE_NOT_INCLUDED,       "WASM code requires a field that was not included."),
         MAKE_ERROR(tefTEMP_DISABLED,               "The transaction requires logic that is currently temporarily disabled."),
         MAKE_ERROR(tefEXCEEDS_LIMIT,               "The transaction exceeds a limit set by fee voting."),
+        MAKE_ERROR(tefFIREWALL_MAX_FEE,            "Fee exceeds Firewall MaxFee."),
 
         MAKE_ERROR(telLOCAL_ERROR,            "Local failure."),
         MAKE_ERROR(telBAD_DOMAIN,             "Domain too long."),

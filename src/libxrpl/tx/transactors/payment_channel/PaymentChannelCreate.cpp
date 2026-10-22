@@ -119,6 +119,8 @@ PaymentChannelCreate::preclaim(PreclaimContext const& ctx)
         if (auto err = checkWithdrawAuth(ctx.view, account, dst, sle, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
+        // Classic DepositAuth is enforced on PaymentChannelClaim, matching
+        // stock XRPL. DepositNoauth still blocks create.
         if (auto err = checkDepositPreauth(
                 ctx.tx, ctx.view, account, dst, sled, ctx.j, /*skipAllowForUnwedge=*/true);
             !isTesSuccess(err))

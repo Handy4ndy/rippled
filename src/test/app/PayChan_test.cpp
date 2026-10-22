@@ -13,6 +13,7 @@
 #include <test/jtx/ter.h>
 #include <test/jtx/ticket.h>
 #include <test/jtx/txflags.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpld/rpc/Context.h>
 #include <xrpld/rpc/Role.h>
@@ -2264,6 +2265,28 @@ struct PayChan_test : public beast::unit_test::Suite
     }
 
     void
+    testWithdrawAuth(FeatureBitset features)
+    {
+        testcase("WithdrawAuth blocks PaymentChannelCreate to unlisted dest");
+        using namespace jtx;
+        using namespace std::chrono_literals;
+        Env env(*this, features);
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        Account const carol{"carol"};
+        env.fund(XRP(10000), alice, bob, carol);
+        env.close();
+        env(fset(alice, asfWithdrawAuth));
+        env.close();
+        env(create(alice, carol, XRP(10), 3600s, alice.pk()), Ter(tecNO_PERMISSION));
+        env.close();
+        env(withdrawauth::auth(alice, bob));
+        env.close();
+        env(create(alice, bob, XRP(10), 3600s, alice.pk()));
+        env.close();
+    }
+
+    void
     testWithFeats(FeatureBitset features)
     {
         testSimple(features);
@@ -2289,6 +2312,7 @@ struct PayChan_test : public beast::unit_test::Suite
         testUsingTickets(features);
         testChannelVerifyLoadType(features);
         testChannelAuthorizeLoadType(features);
+        testWithdrawAuth(features);
     }
 
 public:

@@ -7,7 +7,10 @@
 namespace xrpl::test::jtx::depositnoauth {
 
 json::Value
-unauth(jtx::Account const& account, jtx::Account const& unauth, std::optional<std::uint32_t> expiration)
+unauth(
+    jtx::Account const& account,
+    jtx::Account const& unauth,
+    std::optional<std::uint32_t> expiration)
 {
     json::Value jv;
     jv[sfAccount.jsonName] = account.human();

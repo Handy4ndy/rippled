@@ -215,7 +215,9 @@ depositPreauth(UInt256 const& key) noexcept
 }
 /** @} */
 
-/** A DepositNoauth */
+/**
+ * A DepositNoauth.
+ */
 /** @{ */
 Keylet
 depositNoauth(AccountID const& owner, AccountID const& denied) noexcept;
@@ -282,6 +284,15 @@ inline Keylet
 withdrawSetPreauth(uint256 const& key) noexcept
 {
     return {ltWITHDRAW_SET_PREAUTH, key};
+}
+
+Keylet
+firewall(AccountID const& owner) noexcept;
+
+inline Keylet
+firewall(uint256 const& key) noexcept
+{
+    return {ltFIREWALL, key};
 }
 
 //------------------------------------------------------------------------------
@@ -481,7 +492,7 @@ struct KeyletDesc
 };
 
 // This list should include all of the keylet functions that take a single AccountID parameter.
-extern std::array<KeyletDesc<AccountID const&>, 10> const kDirectAccountKeylets;
+extern std::array<KeyletDesc<AccountID const&>, 11> const kDirectAccountKeylets;
 
 MPTID
 makeMptID(std::uint32_t const sequence, AccountID const& account);

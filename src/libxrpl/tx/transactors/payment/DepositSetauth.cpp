@@ -4,6 +4,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -36,9 +37,8 @@ DepositSetauth::getFlagsMask(PreflightContext const& /*ctx*/)
 NotTEC
 DepositSetauth::preflight(PreflightContext const& ctx)
 {
-
     auto const flags = ctx.tx.getFlags();
-    bool const setNoauth  = (flags & tfSetNoauthList)  != 0;
+    bool const setNoauth = (flags & tfSetNoauthList) != 0;
     bool const setPreauth = (flags & tfSetPreauthList) != 0;
 
     // Exactly one list type flag must be set (framework already verified
@@ -99,14 +99,16 @@ DepositSetauth::preclaim(PreclaimContext const& ctx)
     if (!ctx.view.exists(keylet::account(account)))
         return tefINTERNAL;  // LCOV_EXCL_LINE
 
+    if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, account, ctx.j);
+        !isTesSuccess(ter))
+        return ter;
 
     auto const flags = ctx.tx.getFlags();
-    Keylet const targetKeylet = (flags & tfSetNoauthList)
-        ? keylet::depositSetNoauth(account)
-        : keylet::depositSetPreauth(account);
+    Keylet const targetKeylet = (flags & tfSetNoauthList) ? keylet::depositSetNoauth(account)
+                                                          : keylet::depositSetPreauth(account);
 
-    bool const hasProviders = ctx.tx.isFieldPresent(sfProviders) &&
-                              !ctx.tx.getFieldArray(sfProviders).empty();
+    bool const hasProviders =
+        ctx.tx.isFieldPresent(sfProviders) && !ctx.tx.getFieldArray(sfProviders).empty();
 
     if (!hasProviders)
     {
@@ -131,22 +133,20 @@ TER
 DepositSetauth::doApply()
 {
     auto const flags = ctx_.tx.getFlags();
-    Keylet const targetKeylet = (flags & tfSetNoauthList)
-        ? keylet::depositSetNoauth(accountID_)
-        : keylet::depositSetPreauth(accountID_);
+    Keylet const targetKeylet = (flags & tfSetNoauthList) ? keylet::depositSetNoauth(accountID_)
+                                                          : keylet::depositSetPreauth(accountID_);
 
-    bool const hasProviders = ctx_.tx.isFieldPresent(sfProviders) &&
-                              !ctx_.tx.getFieldArray(sfProviders).empty();
+    bool const hasProviders =
+        ctx_.tx.isFieldPresent(sfProviders) && !ctx_.tx.getFieldArray(sfProviders).empty();
 
     if (!hasProviders)
     {
         // Delete path.
-        return (flags & tfSetNoauthList)
-            ? removeSetNoauthFromLedger(view(), targetKeylet.key, j_)
-            : removeSetPreauthFromLedger(view(), targetKeylet.key, j_);
+        return (flags & tfSetNoauthList) ? removeSetNoauthFromLedger(view(), targetKeylet.key, j_)
+                                         : removeSetPreauthFromLedger(view(), targetKeylet.key, j_);
     }
 
-    // Build sorted STArray — use std::set<AccountID> for dedup + ordering.
+    // Build a sorted STArray. std::set drops duplicates and orders the accounts.
     auto const& txProviders = ctx_.tx.getFieldArray(sfProviders);
     std::set<AccountID> providerSet;
     for (auto const& entry : txProviders)
@@ -174,8 +174,8 @@ DepositSetauth::doApply()
         return tefINTERNAL;  // LCOV_EXCL_LINE
 
     auto applyViewContext = ctx_.getApplyViewContext();
-    if (auto const ret = checkReserve(
-            applyViewContext, sleOwner, preFeeBalance_, {.ownerCountDelta = 1}, j_);
+    if (auto const ret =
+            checkReserve(applyViewContext, sleOwner, preFeeBalance_, {.ownerCountDelta = 1}, j_);
         !isTesSuccess(ret))
         return ret;
 
@@ -201,8 +201,7 @@ DepositSetauth::doApply()
 }
 
 TER
-DepositSetauth::removeSetNoauthFromLedger(
-    ApplyView& view, uint256 const& index, beast::Journal j)
+DepositSetauth::removeSetNoauthFromLedger(ApplyView& view, uint256 const& index, beast::Journal j)
 {
     auto const sle = view.peek(keylet::depositSetNoauth(index));
     if (!sle)
@@ -232,8 +231,7 @@ DepositSetauth::removeSetNoauthFromLedger(
 }
 
 TER
-DepositSetauth::removeSetPreauthFromLedger(
-    ApplyView& view, uint256 const& index, beast::Journal j)
+DepositSetauth::removeSetPreauthFromLedger(ApplyView& view, uint256 const& index, beast::Journal j)
 {
     auto const sle = view.peek(keylet::depositSetPreauth(index));
     if (!sle)
@@ -263,8 +261,7 @@ DepositSetauth::removeSetPreauthFromLedger(
 }
 
 void
-DepositSetauth::visitInvariantEntry(
-    bool, SLE::ConstRef, SLE::ConstRef)
+DepositSetauth::visitInvariantEntry(bool, SLE::ConstRef, SLE::ConstRef)
 {
 }
 

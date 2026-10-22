@@ -12,9 +12,6 @@
 
 namespace xrpl {
 
-/** Subscribe to provider allow/deny lists for outbound payments.
-    Mirrors DepositSetauth; flags tfSetNoauthList / tfSetPreauthList.
- */
 class WithdrawSetauth : public Transactor
 {
 public:

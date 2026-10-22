@@ -881,6 +881,8 @@ Payment::doApply()
     bool const unwedgeEligible =
         dstAmount <= dstReserve && sleDst->getFieldAmount(sfBalance) <= dstReserve;
 
+    // Unwedge skips classic DepositAuth and must not expire credentials.
+    // DepositNoauth is still enforced, read-only.
     if (unwedgeEligible)
     {
         if (auto err = checkDepositPreauth(
@@ -894,9 +896,10 @@ Payment::doApply()
             !isTesSuccess(err))
             return err;
     }
-    else if (auto err = verifyDepositPreauth(
-                 ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
-             !isTesSuccess(err))
+    else if (
+        auto err = verifyDepositPreauth(
+            ctx_.tx, ctx_.view(), accountID_, dstAccountID, sleDst, ctx_.journal);
+        !isTesSuccess(err))
         return err;
 
     // Do the arithmetic for the transfer and make the ledger change.

@@ -21,6 +21,7 @@
 #include <test/jtx/ticket.h>
 #include <test/jtx/trust.h>
 #include <test/jtx/txflags.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/chrono.h>
@@ -2491,6 +2492,27 @@ class Check_test : public beast::unit_test::Suite
     }
 
     void
+    testWithdrawAuth(FeatureBitset features)
+    {
+        testcase("WithdrawAuth blocks CheckCreate to unlisted dest");
+        using namespace test::jtx;
+        Env env(*this, features);
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        Account const carol{"carol"};
+        env.fund(XRP(10000), alice, bob, carol);
+        env.close();
+        env(fset(alice, asfWithdrawAuth));
+        env.close();
+        env(check::create(alice, carol, XRP(5)), Ter(tecNO_PERMISSION));
+        env.close();
+        env(withdrawauth::auth(alice, bob));
+        env.close();
+        env(check::create(alice, bob, XRP(5)));
+        env.close();
+    }
+
+    void
     testWithFeats(FeatureBitset features)
     {
         testEnabled(features);
@@ -2506,6 +2528,7 @@ class Check_test : public beast::unit_test::Suite
         testCancelInvalid(features);
         testDeliveredAmountForCheckCashTxn(features);
         testWithTickets(features);
+        testWithdrawAuth(features);
     }
 
 public:

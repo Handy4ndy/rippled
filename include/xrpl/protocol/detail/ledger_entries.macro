@@ -695,5 +695,18 @@ LEDGER_ENTRY(ltTRANSACTION_PROPOSAL, 0x0091, TransactionProposal, transaction_pr
     {sfOwnerNode,            SoeRequired},
 }))
 
+/** An account firewall. 0x0091 is TransactionProposal. */
+LEDGER_ENTRY(ltFIREWALL, 0x0092, Firewall, firewall, ({
+    {sfOwner,                SoeRequired},
+    {sfCounterparty,         SoeRequired},
+    {sfMaxFee,               SoeOptional},
+    {sfMaxAmount,            SoeOptional},
+    {sfTransferredAmount,    SoeOptional},
+    {sfPeriodStart,          SoeOptional},
+    {sfOwnerNode,            SoeRequired},
+    {sfPreviousTxnID,        SoeRequired},
+    {sfPreviousTxnLgrSeq,    SoeRequired},
+}))
+
 #undef EXPAND
 #undef LEDGER_ENTRY_DUPLICATE

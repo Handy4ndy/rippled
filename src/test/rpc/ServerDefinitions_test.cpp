@@ -505,10 +505,90 @@ public:
     }
 
     void
+    testCustomAmendmentDefinitions()
+    {
+        testcase("PaymentPolicy / Firewall protocol IDs");
+
+        using namespace test::jtx;
+        Env env(*this);
+        auto const result = env.rpc("server_definitions")[jss::result];
+        BEAST_EXPECT(result[jss::status] == "success");
+
+        auto const& tt = result[jss::TRANSACTION_TYPES];
+        BEAST_EXPECT(tt["DepositNoauth"].asUInt() == 23);
+        BEAST_EXPECT(tt["DepositSetauth"].asUInt() == 103);
+        BEAST_EXPECT(tt["WithdrawPreauth"].asUInt() == 104);
+        BEAST_EXPECT(tt["WithdrawNoauth"].asUInt() == 105);
+        BEAST_EXPECT(tt["WithdrawSetauth"].asUInt() == 106);
+        BEAST_EXPECT(tt["FirewallSet"].asUInt() == 107);
+        BEAST_EXPECT(tt["FirewallDelete"].asUInt() == 108);
+        BEAST_EXPECT(!tt.isMember("SubscriptionSet"));
+        BEAST_EXPECT(!tt.isMember("SubscriptionCancel"));
+        BEAST_EXPECT(!tt.isMember("SubscriptionClaim"));
+
+        auto const& le = result[jss::LEDGER_ENTRY_TYPES];
+        BEAST_EXPECT(le["DepositNoauth"].asUInt() == 0x0076);
+        BEAST_EXPECT(le["DepositSetNoauth"].asUInt() == 0x008A);
+        BEAST_EXPECT(le["DepositSetPreauth"].asUInt() == 0x008B);
+        BEAST_EXPECT(le["WithdrawPreauth"].asUInt() == 0x008C);
+        BEAST_EXPECT(le["WithdrawNoauth"].asUInt() == 0x008D);
+        BEAST_EXPECT(le["WithdrawSetNoauth"].asUInt() == 0x008E);
+        BEAST_EXPECT(le["WithdrawSetPreauth"].asUInt() == 0x008F);
+        BEAST_EXPECT(le["Firewall"].asUInt() == 0x0092);
+        BEAST_EXPECT(!le.isMember("Subscription"));
+
+        auto const& tr = result[jss::TRANSACTION_RESULTS];
+        BEAST_EXPECT(tr["tecDEPOSIT_NOAUTH"].asInt() == 203);
+        BEAST_EXPECT(tr["tecWITHDRAW_NOAUTH"].asInt() == 204);
+        BEAST_EXPECT(tr["tecREQUIRES_FLAG"].asInt() == 205);
+        BEAST_EXPECT(tr["tecREQUIRES_COUNTERPARTY"].asInt() == 206);
+        BEAST_EXPECT(tr["tecFIREWALL_ACTIVE"].asInt() == 207);
+        BEAST_EXPECT(tr["tecFIREWALL_BLOCK"].asInt() == 208);
+
+        auto const fieldNth = [&](char const* name) -> int {
+            auto const& fields = result[jss::FIELDS];
+            for (auto const& field : fields)
+            {
+                if (field[0u].asString() == name)
+                    return field[1][jss::nth].asInt();
+            }
+            return -1;
+        };
+        auto const fieldType = [&](char const* name) -> std::string {
+            auto const& fields = result[jss::FIELDS];
+            for (auto const& field : fields)
+            {
+                if (field[0u].asString() == name)
+                    return field[1][jss::type].asString();
+            }
+            return {};
+        };
+        BEAST_EXPECT(fieldNth("Frequency") == -1);
+        BEAST_EXPECT(fieldNth("NextClaimTime") == -1);
+        BEAST_EXPECT(fieldNth("StartTime") == -1);
+        BEAST_EXPECT(fieldNth("SubscriptionID") == -1);
+        BEAST_EXPECT(fieldNth("FirewallID") == 43 && fieldType("FirewallID") == "Hash256");
+        BEAST_EXPECT(fieldNth("MaxAmount") == 35 && fieldType("MaxAmount") == "Amount");
+        BEAST_EXPECT(
+            fieldNth("TransferredAmount") == 36 && fieldType("TransferredAmount") == "Amount");
+        BEAST_EXPECT(fieldNth("PeriodStart") == 86 && fieldType("PeriodStart") == "UInt32");
+        BEAST_EXPECT(fieldNth("Backup") == 33 && fieldType("Backup") == "AccountID");
+        BEAST_EXPECT(fieldNth("MaxFee") == 33 && fieldType("MaxFee") == "Amount");
+        BEAST_EXPECT(fieldNth("CounterpartySignature") == 37);
+        BEAST_EXPECT(fieldNth("DepositProvider") == 40);
+
+        auto const& asf = result[jss::ACCOUNT_SET_FLAGS];
+        BEAST_EXPECT(asf["asfDepositNoauth"].asUInt() == 18);
+        BEAST_EXPECT(asf["asfWithdrawAuth"].asUInt() == 19);
+        BEAST_EXPECT(asf["asfWithdrawNoauth"].asUInt() == 20);
+    }
+
+    void
     run() override
     {
         testServerDefinitions();
         testGetServerDefinitionsJson();
+        testCustomAmendmentDefinitions();
     }
 };
 

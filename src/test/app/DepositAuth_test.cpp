@@ -6,6 +6,7 @@
 #include <test/jtx/balance.h>  // IWYU pragma: keep
 #include <test/jtx/credentials.h>
 #include <test/jtx/deposit.h>
+#include <test/jtx/depositnoauth.h>
 #include <test/jtx/escrow.h>
 #include <test/jtx/fee.h>
 #include <test/jtx/flags.h>
@@ -355,12 +356,35 @@ struct DepositAuth_test : public beast::unit_test::Suite
     }
 
     void
+    testDepositNoauth()
+    {
+        testcase("DepositNoauth blocks inbound XRP payment");
+        using namespace jtx;
+        Env env(*this);
+        Account const alice{"alice"};
+        Account const bob{"bob"};
+        env.fund(XRP(10000), alice, bob);
+        env.close();
+        env(fset(alice, asfDepositNoauth));
+        env.close();
+        env(depositnoauth::unauth(alice, bob));
+        env.close();
+        env(pay(bob, alice, XRP(1)), Ter(tecDEPOSIT_NOAUTH));
+        env.close();
+        env(depositnoauth::auth(alice, bob));
+        env.close();
+        env(pay(bob, alice, XRP(1)));
+        env.close();
+    }
+
+    void
     run() override
     {
         testEnable();
         testPayIOU();
         testPayXRP();
         testNoRipple();
+        testDepositNoauth();
     }
 };
 

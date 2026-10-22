@@ -581,15 +581,18 @@ public:
             return res;
         };
 
-        static constexpr std::array<std::pair<std::string_view, std::uint32_t>, 7> kAsFlags{
+        static constexpr std::array<std::pair<std::string_view, std::uint32_t>, 10> kAsFlags{
             {
                 {"defaultRipple", asfDefaultRipple},
                 {"depositAuth", asfDepositAuth},
+                {"depositNoauth", asfDepositNoauth},
                 {"disallowIncomingXRP", asfDisallowXRP},
                 {"globalFreeze", asfGlobalFreeze},
                 {"noFreeze", asfNoFreeze},
                 {"requireAuthorization", asfRequireAuth},
                 {"requireDestinationTag", asfRequireDest},
+                {"withdrawAuth", asfWithdrawAuth},
+                {"withdrawNoauth", asfWithdrawNoauth},
             },
         };
 

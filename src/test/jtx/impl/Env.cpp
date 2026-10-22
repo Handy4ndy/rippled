@@ -39,10 +39,14 @@
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/Issue.h>
+#include <xrpl/protocol/KeyType.h>
 #include <xrpl/protocol/Keylet.h>
 #include <xrpl/protocol/MPTIssue.h>
+#include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/SField.h>
+#include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/STTx.h>
+#include <xrpl/protocol/Seed.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/TER.h>
 #include <xrpl/protocol/TxFlags.h>
@@ -50,11 +54,21 @@
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/NetworkOPs.h>
 
+#include <sys/file.h>
+
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <ostream>
 #include <source_location>
@@ -66,6 +80,90 @@
 #include <vector>
 
 namespace xrpl::test::jtx {
+
+namespace {
+
+struct TxDumpCfg
+{
+    bool enabled = false;
+    std::string path;
+};
+
+TxDumpCfg
+parseDumpEnv(char const* env)
+{
+    TxDumpCfg c;
+    if (env == nullptr || env[0] == '\0')
+        return c;
+    std::string const v{env};
+    if (v == "0" || v == "false" || v == "off")
+        return c;
+    c.enabled = true;
+    if (v != "1" && v != "true" && v != "on" && v != "log")
+        c.path = v;
+    return c;
+}
+
+TxDumpCfg
+txDumpCfg()
+{
+    static TxDumpCfg const cfg = [] {
+        auto const file = parseDumpEnv(std::getenv("XRPLD_TEST_DUMP_TX"));
+        auto const portal = parseDumpEnv(std::getenv("XRPL_JTX_LOG_JSON"));
+        if (file.enabled)
+            return file;
+        return portal;
+    }();
+    return cfg;
+}
+
+void
+appendJsonlLine(std::string const& path, std::string const& line)
+{
+    int const fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd < 0)
+        return;
+    ::flock(fd, LOCK_EX);
+    auto const wrote = ::write(fd, line.data(), line.size());
+    (void)wrote;
+    ::flock(fd, LOCK_UN);
+    ::close(fd);
+}
+
+json::Value
+replayTemplate(json::Value txJson)
+{
+    txJson.removeMember(jss::TxnSignature);
+    txJson.removeMember(jss::SigningPubKey);
+    txJson.removeMember(jss::Signers);
+    txJson.removeMember(jss::hash);
+    txJson.removeMember("TxnSignature");
+    txJson.removeMember("SigningPubKey");
+    txJson.removeMember("Signers");
+    txJson.removeMember("hash");
+    return txJson;
+}
+
+json::Value
+batchInners(json::Value const& txJson)
+{
+    json::Value inners{json::ValueType::Array};
+    if (!txJson.isObject() || !txJson.isMember(jss::RawTransactions) ||
+        !txJson[jss::RawTransactions].isArray())
+        return inners;
+    auto const& raw = txJson[jss::RawTransactions];
+    for (json::UInt i = 0; i < raw.size(); ++i)
+    {
+        auto const& wrap = raw[i];
+        if (wrap.isObject() && wrap.isMember(jss::RawTransaction))
+            inners.append(wrap[jss::RawTransaction]);
+        else
+            inners.append(wrap);
+    }
+    return inners;
+}
+
+}  // namespace
 
 //------------------------------------------------------------------------------
 
@@ -483,6 +581,7 @@ Env::postconditions(
     json::Value const& jr,
     std::source_location const& loc)
 {
+    dumpTxCheatSheet(jt, parsed, jr, loc);
     auto const locStr = std::string("(") + loc.file_name() + ":" + to_string(loc.line()) + ")";
     bool bad = !test.expect(parsed.ter, "apply " + locStr + ": No ter result!");
     bad =
@@ -532,6 +631,132 @@ Env::postconditions(
     }
     for (auto const& f : jt.require)
         f(*this);
+}
+
+void
+Env::dumpTxCheatSheet(
+    JTx const& jt,
+    ParsedResult const& parsed,
+    json::Value const& jr,
+    std::source_location const& loc)
+{
+    auto const cfg = txDumpCfg();
+    if (!cfg.enabled)
+        return;
+    {
+        auto const srcFile = std::filesystem::path{loc.file_name()}.filename().string();
+        // env.fund / env.trust apply from Env.cpp — not the transactor under test.
+        if (srcFile == "Env.cpp" || srcFile == "Env.h")
+            return;
+    }
+    try
+    {
+        static std::atomic<std::uint64_t> seq{0};
+        auto const n = ++seq;
+
+        json::Value txJson;
+        std::string blob;
+        std::string hash;
+        if (jt.stx)
+        {
+            txJson = jt.stx->getJson(JsonOptions::Values::None);
+            Serializer s;
+            jt.stx->add(s);
+            blob = strHex(s.slice());
+            hash = to_string(jt.stx->getTransactionID());
+        }
+        else
+        {
+            txJson = jt.jv;
+        }
+
+        std::string const got = parsed.ter ? transToken(*parsed.ter) : std::string{"no_ter"};
+        std::string const expect = jt.ter ? transToken(*jt.ter) : std::string{"tesSUCCESS"};
+        std::string txType = "Unknown";
+        if (txJson.isObject() && txJson.isMember(jss::TransactionType))
+            txType = txJson[jss::TransactionType].asString();
+
+        auto const srcFile = std::filesystem::path{loc.file_name()}.filename().string();
+        auto const src = srcFile + ":" + std::to_string(loc.line());
+
+        json::Value accounts{json::ValueType::Object};
+        auto addAccount = [&](AccountID const& id) {
+            auto const iter = map_.find(id);
+            if (iter == map_.end())
+                return;
+            Account const& a = iter->second;
+            if (accounts.isMember(a.human()))
+                return;
+            json::Value rec;
+            rec["name"] = a.name();
+            rec["classic"] = a.human();
+            rec["key_type"] = to_string(publicKeyType(a.pk()).value_or(KeyType::Secp256k1));
+            std::string const phrase = (a.name() == "master") ? "masterpassphrase" : a.name();
+            rec["seed"] = toBase58(generateSeed(phrase));
+            rec["note"] = "jtx test account; fund + re-sign to replay on another ledger";
+            accounts[a.human()] = std::move(rec);
+        };
+        if (jt.stx)
+        {
+            for (auto const& id : jt.stx->getMentionedAccounts())
+                addAccount(id);
+        }
+        else if (
+            txJson.isObject() && txJson.isMember(jss::Account) && txJson[jss::Account].isString())
+        {
+            if (auto const id = parseBase58<AccountID>(txJson[jss::Account].asString()))
+                addAccount(*id);
+        }
+
+        json::Value rec;
+        rec["n"] = static_cast<json::UInt>(n);
+        rec["src"] = src;
+        rec["file"] = srcFile;
+        rec["line"] = static_cast<json::UInt>(loc.line());
+        rec["tx_type"] = txType;
+        rec["expect"] = expect;
+        rec["got"] = got;
+        rec["match"] = (expect == got);
+        if (parsed.ter)
+            rec["engine_result_code"] = TERtoInt(*parsed.ter);
+        rec["engine_result_message"] = parsed.ter ? transHuman(*parsed.ter) : "";
+        rec["hash"] = hash;
+        rec["tx_blob"] = blob;
+        rec["tx_json"] = txJson;
+        rec["template"] = replayTemplate(txJson);
+        rec["accounts"] = accounts;
+        rec["network_id"] = static_cast<json::UInt>(app().getNetworkIDService().getNetworkID());
+        rec["ledger_index"] = static_cast<json::UInt>(current()->seq());
+        rec["lab_network_id"] = 21380;
+        rec["replay"] =
+            "Copy template, set NetworkID 21380 and a fresh Sequence/Fee, sign "
+            "with the listed seed, submit to the hub. Do not reuse tx_blob on "
+            "another ledger.";
+        auto const inners = batchInners(txJson);
+        if (inners.size() > 0)
+            rec["inners"] = inners;
+        if (jr)
+            rec["submit_rpc"] = jr;
+
+        if (!cfg.path.empty())
+        {
+            auto line = json::to_string(rec);
+            if (line.empty() || line.back() != '\n')
+                line.push_back('\n');
+            appendJsonlLine(cfg.path, line);
+        }
+
+        test.log << "# cheat-sheet tx " << n << "  " << txType << "  " << got << " (expect "
+                 << expect << ")  " << src << '\n'
+                 << pretty(txJson) << '\n';
+        if (accounts.size() > 0)
+            test.log << "# accounts " << json::to_string(accounts) << '\n';
+        test.log << std::flush;
+    }
+    catch (...)
+    {
+        // Dump must never fail a unit test.
+    }
 }
 
 std::shared_ptr<STObject const>

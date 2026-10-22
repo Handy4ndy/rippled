@@ -104,6 +104,8 @@ CheckCreate::preclaim(PreclaimContext const& ctx)
         if (auto err = checkWithdrawAuth(ctx.view, srcId, dstId, sleSrc, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
+        // Classic DepositAuth is enforced when the dest cashes. DepositNoauth
+        // still blocks create: dest has denied this sender.
         if (auto err = checkDepositPreauth(
                 ctx.tx, ctx.view, srcId, dstId, sleDst, ctx.j, /*skipAllowForUnwedge=*/true);
             !isTesSuccess(err))

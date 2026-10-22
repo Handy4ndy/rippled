@@ -409,6 +409,8 @@ checkDepositPreauth(
         }
     }
 
+    // Obligation create (Check/PayChan/Escrow) and dest-signed cash unwedge:
+    // classic DepositAuth must not block; DepositNoauth still does.
     if (skipAllowForUnwedge)
         return tesSUCCESS;
 
@@ -432,8 +434,7 @@ checkDepositPreauth(
 
         return !tx.isFieldPresent(sfCredentialIDs)
             ? tecNO_PERMISSION
-            : credentials::authorizedDepositPreauth(
-                  view, tx.getFieldV256(sfCredentialIDs), dst);
+            : credentials::authorizedDepositPreauth(view, tx.getFieldV256(sfCredentialIDs), dst);
     }
 
     return tesSUCCESS;
@@ -456,11 +457,7 @@ cleanupExpiredCredentials(STTx const& tx, ApplyView& view, beast::Journal j)
 }
 
 static TER
-eraseExpiredNoauth(
-    ApplyView& view,
-    SLE::Ref sleNoauth,
-    Keylet const& noauthKey,
-    beast::Journal j)
+eraseExpiredNoauth(ApplyView& view, SLE::Ref sleNoauth, Keylet const& noauthKey, beast::Journal j)
 {
     AccountID const account = sleNoauth->getAccountID(sfAccount);
     std::uint64_t const page = sleNoauth->getFieldU64(sfOwnerNode);
@@ -567,11 +564,13 @@ checkWithdrawAuth(
     if (!sleSrc || src == dst)
         return tesSUCCESS;
 
-    if (!view.rules().enabled(featurePaymentPolicy))
+    bool const paymentPolicy = view.rules().enabled(featurePaymentPolicy);
+    bool const hardFw = view.rules().enabled(featureFirewall) && view.exists(keylet::firewall(src));
+    if (!paymentPolicy && !hardFw)
         return tesSUCCESS;
 
-    bool const denyMode = (sleSrc->getFlags() & lsfWithdrawNoauth) != 0u;
-    bool const allowMode = (sleSrc->getFlags() & lsfWithdrawAuth) != 0u;
+    bool const denyMode = hardFw || ((sleSrc->getFlags() & lsfWithdrawNoauth) != 0u);
+    bool const allowMode = hardFw || ((sleSrc->getFlags() & lsfWithdrawAuth) != 0u);
 
     if (denyMode)
     {
@@ -601,7 +600,10 @@ checkWithdrawAuth(
                     return tesSUCCESS;
             }
         }
-        return tecNO_PERMISSION;
+        if (!hardFw)
+            return tecNO_PERMISSION;
+        // Hard Firewall: checkFirewall already required CP for non-preauth dest.
+        return tesSUCCESS;
     }
 
     return tesSUCCESS;
@@ -624,7 +626,8 @@ verifyWithdrawAuth(
 
     if ((sleSrc->getFlags() & lsfWithdrawNoauth) != 0u)
     {
-        if (auto const ter = expireWithdrawNoauthIfNeeded(view, keylet::withdrawNoauth(src, dst), j);
+        if (auto const ter =
+                expireWithdrawNoauthIfNeeded(view, keylet::withdrawNoauth(src, dst), j);
             !isTesSuccess(ter))
             return ter;
         if (auto const sleSet = view.read(keylet::withdrawSetNoauth(src)))
@@ -650,7 +653,17 @@ verifyUncontrolledValueExit(
     SLE::ConstRef sleSrc,
     beast::Journal j)
 {
-    if (!sleSrc || !view.rules().enabled(featurePaymentPolicy))
+    if (!sleSrc)
+        return tesSUCCESS;
+
+    bool const paymentPolicy = view.rules().enabled(featurePaymentPolicy);
+    bool const hardFw =
+        view.rules().enabled(featureFirewall) && view.exists(keylet::firewall(account));
+    if (!paymentPolicy && !hardFw)
+        return tesSUCCESS;
+
+    // Hard Firewall: checkFirewall already requires CP for block-class.
+    if (hardFw)
         return tesSUCCESS;
 
     auto const flags = sleSrc->getFlags();
@@ -667,6 +680,9 @@ verifyUncontrolledValueExit(
 bool
 accountBlocksUncontrolledExit(ReadView const& view, AccountID const& account)
 {
+    if (view.rules().enabled(featureFirewall) && view.exists(keylet::firewall(account)))
+        return true;
+
     if (!view.rules().enabled(featurePaymentPolicy))
         return false;
 

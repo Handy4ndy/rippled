@@ -1021,6 +1021,13 @@ protected:
     virtual void
     autofill(JTx& jt);
 
+    void
+    dumpTxCheatSheet(
+        JTx const& jt,
+        ParsedResult const& parsed,
+        json::Value const& jr,
+        std::source_location const& loc);
+
     /**
      * Create a STTx from a JTx
      * The framework requires that JSON is valid.

@@ -7,6 +7,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/OpenView.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/protocol/Rules.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/SeqProxy.h>
@@ -204,6 +205,10 @@ invokePreclaim(PreclaimContext const& ctx)
                     return baseFee.error();
 
                 if (TER const result = T::checkFee(ctx, *baseFee))
+                    return result;
+
+                if (TER const result = checkFirewall(ctx.view, ctx.tx, ctx.j);
+                    !isTesSuccess(result))
                     return result;
             }
 

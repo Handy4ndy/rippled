@@ -1,0 +1,37 @@
+#pragma once
+
+#include <xrpl/tx/Transactor.h>
+
+namespace xrpl {
+
+class FirewallSet : public Transactor
+{
+public:
+    static constexpr auto kConsequencesFactory = ConsequencesFactoryType::Blocker;
+
+    explicit FirewallSet(ApplyContext& ctx) : Transactor(ctx)
+    {
+    }
+
+    static NotTEC
+    preflight(PreflightContext const& ctx);
+
+    static TER
+    preclaim(PreclaimContext const& ctx);
+
+    TER
+    doApply() override;
+
+    void
+    visitInvariantEntry(bool isDelete, SLE::ConstRef before, SLE::ConstRef after) override;
+
+    [[nodiscard]] bool
+    finalizeInvariants(
+        STTx const& tx,
+        TER result,
+        XRPAmount fee,
+        ReadView const& view,
+        beast::Journal const& j) override;
+};
+
+}  // namespace xrpl

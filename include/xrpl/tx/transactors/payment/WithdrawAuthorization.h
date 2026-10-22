@@ -12,9 +12,6 @@
 
 namespace xrpl {
 
-/// Handles both ttWITHDRAW_PREAUTH (outgoing whitelist) and
-/// ttWITHDRAW_NOAUTH (outgoing blacklist) transactions in a single transactor.
-/// The active mode is determined at runtime via getTxnType().
 class WithdrawAuthorization : public Transactor
 {
 public:
@@ -44,9 +41,6 @@ public:
         ReadView const& view,
         beast::Journal const& j) override;
 
-    // Interface used by AccountDelete — one per SLE type so the
-    // nonObligationDeleter switch can route ltWITHDRAW_PREAUTH and
-    // ltWITHDRAW_NOAUTH independently.
     static TER
     removePreauthFromLedger(ApplyView& view, uint256 const& delIndex, beast::Journal j);
 

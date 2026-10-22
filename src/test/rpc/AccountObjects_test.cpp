@@ -3,6 +3,9 @@
 #include <test/jtx/TestHelpers.h>
 #include <test/jtx/amount.h>
 #include <test/jtx/deposit.h>
+#include <test/jtx/depositnoauth.h>
+#include <test/jtx/firewall.h>
+#include <test/jtx/flags.h>
 #include <test/jtx/multisign.h>
 #include <test/jtx/offer.h>
 #include <test/jtx/owners.h>  // IWYU pragma: keep
@@ -15,6 +18,7 @@
 #include <test/jtx/token.h>
 #include <test/jtx/trust.h>
 #include <test/jtx/txflags.h>
+#include <test/jtx/withdrawauth.h>
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
@@ -642,6 +646,9 @@ public:
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::account), 0));
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::check), 0));
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::deposit_preauth), 0));
+        BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::deposit_noauth), 0));
+        BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::withdraw_preauth), 0));
+        BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::firewall), 0));
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::escrow), 0));
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::nft_page), 0));
         BEAST_EXPECT(acctObjsIsSize(acctObjs(gw, jss::offer), 0));
@@ -715,6 +722,45 @@ public:
             auto const& preauth = resp[jss::result][jss::account_objects][0u];
             BEAST_EXPECT(preauth[sfAccount.jsonName] == gw.human());
             BEAST_EXPECT(preauth[sfAuthorize.jsonName] == alice.human());
+        }
+        env(fset(gw, asfDepositNoauth));
+        env(fset(gw, asfWithdrawAuth));
+        env.close();
+        env(depositnoauth::unauth(gw, alice));
+        env.close();
+        {
+            json::Value const resp = acctObjs(gw, jss::deposit_noauth);
+            BEAST_EXPECT(acctObjsIsSize(resp, 1));
+            auto const& noauth = resp[jss::result][jss::account_objects][0u];
+            BEAST_EXPECT(noauth[sfAccount.jsonName] == gw.human());
+            BEAST_EXPECT(noauth[sfUnauthorize.jsonName] == alice.human());
+        }
+        env(withdrawauth::auth(gw, alice));
+        env.close();
+        {
+            json::Value const resp = acctObjs(gw, jss::withdraw_preauth);
+            BEAST_EXPECT(acctObjsIsSize(resp, 1));
+            auto const& preauth = resp[jss::result][jss::account_objects][0u];
+            BEAST_EXPECT(preauth[sfAccount.jsonName] == gw.human());
+            BEAST_EXPECT(preauth[sfAuthorize.jsonName] == alice.human());
+        }
+        {
+            Account const cp{"cp"};
+            Account const backup{"backup"};
+            env.fund(XRP(10000), cp, backup);
+            env.close();
+            env(firewall::setCreate(gw, cp, backup, 100000));
+            env.close();
+            json::Value const resp = acctObjs(gw, jss::firewall);
+            BEAST_EXPECT(acctObjsIsSize(resp, 1));
+            auto const& fw = resp[jss::result][jss::account_objects][0u];
+            BEAST_EXPECT(fw[sfOwner.jsonName] == gw.human());
+            BEAST_EXPECT(fw[sfCounterparty.jsonName] == cp.human());
+            env(firewall::del(gw, keylet::firewall(gw.id()).key), Sig(sfCounterpartySignature, cp));
+            env.close();
+            env(fclear(gw, asfWithdrawAuth));
+            env(fclear(gw, asfDepositNoauth));
+            env.close();
         }
         {
             // gw creates an escrow that we can look for in the ledger.

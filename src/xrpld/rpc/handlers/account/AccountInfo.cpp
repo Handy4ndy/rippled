@@ -99,7 +99,10 @@ writeAccountRoot(json::Value& value, SLE const& accountRoot, ReadView const& led
     // since the amendment IDs are computed at runtime.
     static auto const kAmendmentGatedFlags =
         std::to_array<std::tuple<std::string_view, LedgerSpecificFlags, UInt256 const&>>(
-            {{"allowTrustLineLocking", lsfAllowTrustLineLocking, featureTokenEscrow}});
+            {{"allowTrustLineLocking", lsfAllowTrustLineLocking, featureTokenEscrow},
+             {"depositNoauth", lsfDepositNoauth, featurePaymentPolicy},
+             {"withdrawAuth", lsfWithdrawAuth, featurePaymentPolicy},
+             {"withdrawNoauth", lsfWithdrawNoauth, featurePaymentPolicy}});
 
     // Every `AccountRoot` flag must be reported by `account_info`, so if a new flag is added, it
     // needs to be added to one of the arrays above. This can't be a `static_assert` because

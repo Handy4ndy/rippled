@@ -348,8 +348,7 @@ NFTokenAcceptOffer::pay(AccountID const& from, AccountID const& to, STAmount con
 
     {
         auto const sleFrom = view().read(keylet::account(from));
-        if (auto err = verifyWithdrawAuth(view(), from, to, sleFrom, j_, 0);
-            !isTesSuccess(err))
+        if (auto err = verifyWithdrawAuth(view(), from, to, sleFrom, j_, 0); !isTesSuccess(err))
             return err;
         auto const sleTo = view().read(keylet::account(to));
         // Deny-only: NFT settlement did not honour classic DepositAuth before

@@ -4,6 +4,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/ledger/helpers/AccountRootHelpers.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
+#include <xrpl/ledger/helpers/PaymentPolicyHelpers.h>
 #include <xrpl/ledger/helpers/SponsorHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Feature.h>
@@ -36,7 +37,6 @@ WithdrawSetauth::getFlagsMask(PreflightContext const& /*ctx*/)
 NotTEC
 WithdrawSetauth::preflight(PreflightContext const& ctx)
 {
-
     auto const flags = ctx.tx.getFlags();
     bool const setNoauth = (flags & tfSetNoauthList) != 0;
     bool const setPreauth = (flags & tfSetPreauthList) != 0;
@@ -97,14 +97,16 @@ WithdrawSetauth::preclaim(PreclaimContext const& ctx)
     if (!ctx.view.exists(keylet::account(account)))
         return tefINTERNAL;  // LCOV_EXCL_LINE
 
+    if (auto const ter = requireCounterpartyIfFirewalled(ctx.view, ctx.tx, account, ctx.j);
+        !isTesSuccess(ter))
+        return ter;
 
     auto const flags = ctx.tx.getFlags();
-    Keylet const targetKeylet = (flags & tfSetNoauthList)
-        ? keylet::withdrawSetNoauth(account)
-        : keylet::withdrawSetPreauth(account);
+    Keylet const targetKeylet = (flags & tfSetNoauthList) ? keylet::withdrawSetNoauth(account)
+                                                          : keylet::withdrawSetPreauth(account);
 
-    bool const hasProviders = ctx.tx.isFieldPresent(sfProviders) &&
-        !ctx.tx.getFieldArray(sfProviders).empty();
+    bool const hasProviders =
+        ctx.tx.isFieldPresent(sfProviders) && !ctx.tx.getFieldArray(sfProviders).empty();
 
     if (!hasProviders)
     {
@@ -127,18 +129,16 @@ TER
 WithdrawSetauth::doApply()
 {
     auto const flags = ctx_.tx.getFlags();
-    Keylet const targetKeylet = (flags & tfSetNoauthList)
-        ? keylet::withdrawSetNoauth(accountID_)
-        : keylet::withdrawSetPreauth(accountID_);
+    Keylet const targetKeylet = (flags & tfSetNoauthList) ? keylet::withdrawSetNoauth(accountID_)
+                                                          : keylet::withdrawSetPreauth(accountID_);
 
-    bool const hasProviders = ctx_.tx.isFieldPresent(sfProviders) &&
-        !ctx_.tx.getFieldArray(sfProviders).empty();
+    bool const hasProviders =
+        ctx_.tx.isFieldPresent(sfProviders) && !ctx_.tx.getFieldArray(sfProviders).empty();
 
     if (!hasProviders)
     {
-        return (flags & tfSetNoauthList)
-            ? removeSetNoauthFromLedger(view(), targetKeylet.key, j_)
-            : removeSetPreauthFromLedger(view(), targetKeylet.key, j_);
+        return (flags & tfSetNoauthList) ? removeSetNoauthFromLedger(view(), targetKeylet.key, j_)
+                                         : removeSetPreauthFromLedger(view(), targetKeylet.key, j_);
     }
 
     auto const& txProviders = ctx_.tx.getFieldArray(sfProviders);
@@ -166,8 +166,8 @@ WithdrawSetauth::doApply()
         return tefINTERNAL;  // LCOV_EXCL_LINE
 
     auto applyViewContext = ctx_.getApplyViewContext();
-    if (auto const ret = checkReserve(
-            applyViewContext, sleOwner, preFeeBalance_, {.ownerCountDelta = 1}, j_);
+    if (auto const ret =
+            checkReserve(applyViewContext, sleOwner, preFeeBalance_, {.ownerCountDelta = 1}, j_);
         !isTesSuccess(ret))
         return ret;
 
@@ -190,10 +190,7 @@ WithdrawSetauth::doApply()
 }
 
 TER
-WithdrawSetauth::removeSetNoauthFromLedger(
-    ApplyView& view,
-    uint256 const& index,
-    beast::Journal j)
+WithdrawSetauth::removeSetNoauthFromLedger(ApplyView& view, uint256 const& index, beast::Journal j)
 {
     auto const sle = view.peek(keylet::withdrawSetNoauth(index));
     if (!sle)
@@ -223,10 +220,7 @@ WithdrawSetauth::removeSetNoauthFromLedger(
 }
 
 TER
-WithdrawSetauth::removeSetPreauthFromLedger(
-    ApplyView& view,
-    uint256 const& index,
-    beast::Journal j)
+WithdrawSetauth::removeSetPreauthFromLedger(ApplyView& view, uint256 const& index, beast::Journal j)
 {
     auto const sle = view.peek(keylet::withdrawSetPreauth(index));
     if (!sle)
@@ -256,8 +250,7 @@ WithdrawSetauth::removeSetPreauthFromLedger(
 }
 
 void
-WithdrawSetauth::visitInvariantEntry(
-    bool, SLE::ConstRef, SLE::ConstRef)
+WithdrawSetauth::visitInvariantEntry(bool, SLE::ConstRef, SLE::ConstRef)
 {
 }
 

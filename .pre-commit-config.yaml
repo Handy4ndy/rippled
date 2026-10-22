@@ -173,5 +173,9 @@ exclude: |
   (?x)^(
       external/.*|
       .github/scripts/levelization/results/.*\.txt|
-      src/tests/libxrpl/protocol_autogen/(transactions|ledger_entries)/.*
+      src/tests/libxrpl/protocol_autogen/(transactions|ledger_entries)/.*|
+      # Amendment specs, plus the local cluster and standalone node.
+      testAmendment/.*|
+      devnet/.*|
+      standalone/.*
   )$

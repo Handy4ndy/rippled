@@ -258,6 +258,8 @@ EscrowCreate::preclaim(PreclaimContext const& ctx)
         if (auto err = checkWithdrawAuth(ctx.view, account, dest, sleSrc, ctx.j, dtag);
             !isTesSuccess(err))
             return err;
+        // Classic DepositAuth is enforced on EscrowFinish, matching stock XRPL.
+        // DepositNoauth still blocks create.
         if (auto err = checkDepositPreauth(
                 ctx.tx, ctx.view, account, dest, sled, ctx.j, /*skipAllowForUnwedge=*/true);
             !isTesSuccess(err))
